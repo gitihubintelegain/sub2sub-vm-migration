@@ -1,0 +1,7 @@
+{
+  "sourceSubscription": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "destinationSubscription": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
+  "resourceGroup": "rg-prod-app",
+  "vmName": "vm-prod-01",
+  "destinationRegion": "centralindia"
+}
