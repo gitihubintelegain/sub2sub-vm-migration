@@ -1,0 +1,46 @@
+name: Sub2Sub VM Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      sourceSubscription:
+        required: true
+      destinationSubscription:
+        required: true
+      resourceGroup:
+        required: true
+      vmName:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ github.event.inputs.sourceSubscription }}
+
+      - name: Install Az PowerShell
+        shell: pwsh
+        run: |
+          Install-Module Az -Scope CurrentUser -Force
+          Import-Module Az
+
+      - name: Run Validation Phase
+        shell: pwsh
+        run: |
+          ./scripts/main.ps1 `
+            -SourceSubscription "${{ github.event.inputs.sourceSubscription }}" `
+            -DestinationSubscription "${{ github.event.inputs.destinationSubscription }}" `
+            -ResourceGroup "${{ github.event.inputs.resourceGroup }}" `
+            -VMName "${{ github.event.inputs.vmName }}"
