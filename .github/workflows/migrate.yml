@@ -2,15 +2,6 @@ name: Sub2Sub VM Migration
 
 on:
   workflow_dispatch:
-    inputs:
-      sourceSubscription:
-        required: true
-      destinationSubscription:
-        required: true
-      resourceGroup:
-        required: true
-      vmName:
-        required: true
 
 permissions:
   id-token: write
@@ -23,24 +14,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read Config
+        id: config
+        run: |
+          echo "SOURCE_SUB=$(jq -r .sourceSubscription config/migration-config.json)" >> $GITHUB_ENV
+          echo "DEST_SUB=$(jq -r .destinationSubscription config/migration-config.json)" >> $GITHUB_ENV
+          echo "RG=$(jq -r .resourceGroup config/migration-config.json)" >> $GITHUB_ENV
+          echo "VM=$(jq -r .vmName config/migration-config.json)" >> $GITHUB_ENV
+
       - name: Azure Login
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ github.event.inputs.sourceSubscription }}
+          subscription-id: ${{ env.SOURCE_SUB }}
 
-      - name: Install Az PowerShell
+      - name: Install Az Module
         shell: pwsh
         run: |
           Install-Module Az -Scope CurrentUser -Force
-          Import-Module Az
 
-      - name: Run Validation Phase
+      - name: Run Script
         shell: pwsh
         run: |
           ./scripts/main.ps1 `
-            -SourceSubscription "${{ github.event.inputs.sourceSubscription }}" `
-            -DestinationSubscription "${{ github.event.inputs.destinationSubscription }}" `
-            -ResourceGroup "${{ github.event.inputs.resourceGroup }}" `
-            -VMName "${{ github.event.inputs.vmName }}"
+            -SourceSubscription "$env:SOURCE_SUB" `
+            -DestinationSubscription "$env:DEST_SUB" `
+            -ResourceGroup "$env:RG" `
+            -VMName "$env:VM"
