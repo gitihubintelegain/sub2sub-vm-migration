@@ -20,7 +20,6 @@ jobs:
           echo "DEST_SUB=$(jq -r .destinationSubscription config/migration-config.json)" >> $GITHUB_ENV
           echo "RG=$(jq -r .resourceGroup config/migration-config.json)" >> $GITHUB_ENV
           echo "VM=$(jq -r .vmName config/migration-config.json)" >> $GITHUB_ENV
-          echo "VAULT=$(jq -r .sourceVaultName config/migration-config.json)" >> $GITHUB_ENV
 
       - name: Azure Login
         uses: azure/login@v2
@@ -39,11 +38,3 @@ jobs:
             -ResourceGroup "$env:RG" `
             -VMName "$env:VM" `
             -SourceVaultName "$env:VAULT"
-
-      - name: Upload Backup Policy Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backup-policy-${{ env.VM }}
-          path: ${{ runner.temp }}/exported-policy-${{ env.VM }}.json
-          if-no-files-found: ignore
