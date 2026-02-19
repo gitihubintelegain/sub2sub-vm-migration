@@ -3,6 +3,6 @@
   "destinationSubscription": "46689057-be43-4229-9241-e0591dad4dbf",
   "resourceGroup": "Dev-RG",
   "vmName": "ubuntu",
-  "destinationRegion": "centralindia"
+  "destinationRegion": "centralindia",
   "sourceVaultName": "ubuntu1"
 }
