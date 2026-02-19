@@ -16,9 +16,16 @@ $vaultFound = $null
 foreach ($vault in $vaults) {
     Set-AzRecoveryServicesVaultContext -Vault $vault
 
+    $container = Get-AzRecoveryServicesBackupContainer `
+    -ContainerType AzureVM `
+    -Status Registered `
+    -FriendlyName $VMName `
+    -ErrorAction SilentlyContinue
+
+if ($container) {
     $item = Get-AzRecoveryServicesBackupItem `
+        -Container $container `
         -WorkloadType AzureVM `
-        -Name $VMName `
         -ErrorAction SilentlyContinue
 
     if ($item) {
@@ -27,7 +34,7 @@ foreach ($vault in $vaults) {
         break
     }
 }
-
+}
 if (-not $backupItem) {
     Write-Host "No backup protection found. Skipping Phase 2."
     return
