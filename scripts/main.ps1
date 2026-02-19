@@ -9,7 +9,10 @@ param(
     [string]$ResourceGroup,
 
     [Parameter(Mandatory)]
-    [string]$VMName
+    [string]$VMName,
+
+    [Parameter(Mandatory)]
+    [string]$SourceVaultName
 )
 
 Write-Host "Phase 1 - Validation"
@@ -23,4 +26,5 @@ Write-Host "Phase 2 - Backup Cleanup"
 . "$PSScriptRoot/phases/02-backup-cleanup.ps1" `
     -SourceSubscription $SourceSubscription `
     -ResourceGroup $ResourceGroup `
-    -VMName $VMName
+    -VMName $VMName `
+    -SourceVaultName $SourceVaultName
