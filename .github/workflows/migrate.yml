@@ -28,6 +28,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ env.SOURCE_SUB }}
+          enable-AzPSSession: true
 
       - name: Install Az Module
         shell: pwsh
