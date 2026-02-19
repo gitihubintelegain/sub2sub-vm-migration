@@ -16,13 +16,16 @@ param(
 )
 
 Write-Host "Phase 1 - Validation"
+
 . "$PSScriptRoot/phases/01-validate.ps1" `
     -SourceSubscription $SourceSubscription `
     -DestinationSubscription $DestinationSubscription `
     -ResourceGroup $ResourceGroup `
-    -VMName $VMName
+    -VMName $VMName `
+    -SourceVaultName $SourceVaultName
 
 Write-Host "Phase 2 - Backup Cleanup"
+
 . "$PSScriptRoot/phases/02-backup-cleanup.ps1" `
     -SourceSubscription $SourceSubscription `
     -ResourceGroup $ResourceGroup `
