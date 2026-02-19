@@ -1,7 +1,7 @@
 {
-  "sourceSubscription": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "destinationSubscription": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
-  "resourceGroup": "rg-prod-app",
-  "vmName": "vm-prod-01",
+  "sourceSubscription": "d4e068bf-2473-4201-b10a-7f8501d50ebc",
+  "destinationSubscription": "46689057-be43-4229-9241-e0591dad4dbf",
+  "resourceGroup": "Dev-RG",
+  "vmName": "ubuntu",
   "destinationRegion": "centralindia"
 }
