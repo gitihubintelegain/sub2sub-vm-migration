@@ -40,31 +40,19 @@ Write-Host "VM ARM ID: $vmId"
 # -------------------------------------------------------
 # 4. Locate Active Backup Item (Standard + Enhanced Safe)
 # -------------------------------------------------------
-Write-Host "Locating active protected backup item (no container type filter)..."
+Write-Host "Locating active protected backup item..."
 
-$backupItem = $null
+# This works in Az 14.x and 15.x
+$allItems = Get-AzRecoveryServicesBackupItem `
+    -WorkloadType AzureVM `
+    -ErrorAction Stop
 
-$containers = Get-AzRecoveryServicesBackupContainer -ErrorAction Stop
-
-foreach ($container in $containers) {
-
-    $items = Get-AzRecoveryServicesBackupItem `
-        -Container $container `
-        -ErrorAction SilentlyContinue
-
-    foreach ($item in $items) {
-
-        if ($item.SourceResourceId -eq $vmId -and $item.ProtectionState -eq 1) {
-            $backupItem = $item
-            break
-        }
-    }
-
-    if ($backupItem) { break }
+$backupItem = $allItems | Where-Object {
+    $_.SourceResourceId -eq $vmId -and $_.ProtectionState -eq 1
 }
 
 if (-not $backupItem) {
-    Write-Host "NO ACTIVE protected backup item found. Skipping backup cleanup."
+    Write-Host "No ACTIVE protected backup item found. Skipping backup cleanup."
     return
 }
 
