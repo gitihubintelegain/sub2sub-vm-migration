@@ -1,94 +1,62 @@
 param(
     [string]$SourceSubscription,
     [string]$ResourceGroup,
-    [string]$VMName
+    [string]$VMName,
+    [string]$SourceVaultName
 )
 
 Write-Host "Setting context to source subscription..."
 Set-AzContext -SubscriptionId $SourceSubscription
 
-Write-Host "Searching for Recovery Services Vault protecting VM..."
+Write-Host "Fetching Recovery Services Vault: $SourceVaultName"
 
-$vaults = Get-AzRecoveryServicesVault
-$backupItem = $null
-$vaultFound = $null
+$vault = Get-AzRecoveryServicesVault -Name $SourceVaultName -ErrorAction Stop
 
-foreach ($vault in $vaults) {
+Set-AzRecoveryServicesVaultContext -Vault $vault
 
-    Set-AzRecoveryServicesVaultContext -Vault $vault
+Write-Host "Locating backup container..."
 
-    # Get all Azure VM containers (no version-sensitive params)
-    $containers = Get-AzRecoveryServicesBackupContainer -ContainerType AzureVM -ErrorAction SilentlyContinue
+$container = Get-AzRecoveryServicesBackupContainer -ContainerType AzureVM |
+    Where-Object { $_.FriendlyName -eq $VMName }
 
-    foreach ($container in $containers) {
-
-        # FriendlyName usually equals VM name
-        if ($container.FriendlyName -eq $VMName) {
-
-            $items = Get-AzRecoveryServicesBackupItem `
-                -Container $container `
-                -WorkloadType AzureVM `
-                -ErrorAction SilentlyContinue
-
-            if ($items) {
-                $backupItem = $items
-                $vaultFound = $vault
-                break
-            }
-        }
-    }
-
-    if ($backupItem) { break }
-}
-
-if (-not $backupItem) {
-    Write-Host "No backup protection found. Skipping Phase 2."
+if (-not $container) {
+    Write-Host "VM not registered in specified vault. Skipping backup cleanup."
     return
 }
 
-Write-Host "Backup found in vault: $($vaultFound.Name)"
+$backupItem = Get-AzRecoveryServicesBackupItem -Container $container -WorkloadType AzureVM
 
-# Export Backup Policy
-Write-Host "Dumping backup item structure for analysis..."
+if (-not $backupItem) {
+    Write-Host "No active backup item found. Skipping."
+    return
+}
 
-$backupItem | ConvertTo-Json -Depth 20
+Write-Host "Backup item found."
 
-throw "Inspection mode - stopping here intentionally."
+# If already soft-deleted, skip
+if ($backupItem.IsScheduledForDeferredDelete -eq $true -or $backupItem.DeletionState -ne 0) {
+    Write-Host "Backup already in soft-delete state. Skipping disable."
+    return
+}
 
-# Disable Protection and Remove Recovery Points
+Write-Host "Active backup detected."
+
+$policyArmId = $backupItem.PolicyId
+
+if (-not $policyArmId) {
+    throw "PolicyId missing for active backup item."
+}
+
+Write-Host "Exporting policy..."
+$policy = Get-AzResource -ResourceId $policyArmId -ErrorAction Stop
+$policyExportPath = "$env:RUNNER_TEMP/exported-policy-$VMName.json"
+$policy | ConvertTo-Json -Depth 20 | Out-File $policyExportPath
+Write-Host "Policy exported to $policyExportPath"
+
 Write-Host "Disabling backup and removing recovery points..."
-
 Disable-AzRecoveryServicesBackupProtection `
     -Item $backupItem `
     -RemoveRecoveryPoints `
     -Force
 
-# Wait for cleanup
-Write-Host "Waiting for protection state to change..."
-
-$maxRetries = 30
-$retry = 0
-$protectionRemoved = $false
-
-while ($retry -lt $maxRetries) {
-    Start-Sleep -Seconds 20
-
-    $itemCheck = Get-AzRecoveryServicesBackupItem `
-        -WorkloadType AzureVM `
-        -Name $VMName `
-        -ErrorAction SilentlyContinue
-
-    if (-not $itemCheck) {
-        $protectionRemoved = $true
-        break
-    }
-
-    Write-Host "Still removing backup... attempt $retry"
-    $retry++
-}
-
-if (-not $protectionRemoved) {
-    throw "Backup removal did not complete within expected time."
-}
-
-Write-Host "Backup cleanup completed successfully."
+Write-Host "Backup cleanup initiated."
