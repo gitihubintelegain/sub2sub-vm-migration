@@ -24,18 +24,20 @@ if (-not $container) {
     return
 }
 
-$backupItem = Get-AzRecoveryServicesBackupItem -Container $container -WorkloadType AzureVM
+$items = Get-AzRecoveryServicesBackupItem -Container $container -WorkloadType AzureVM
+
+$backupItem = $items | Where-Object { $_.ProtectionState -eq 1 }
 
 if (-not $backupItem) {
-    Write-Host "No active backup item found. Skipping."
+    Write-Host "No active protected backup item found. Skipping."
     return
 }
 
 Write-Host "Backup item found."
 
 # If already soft-deleted, skip
-if ($backupItem.IsScheduledForDeferredDelete -eq $true -or $backupItem.DeletionState -ne 0) {
-    Write-Host "Backup already in soft-delete state. Skipping disable."
+if ($backupItem.ProtectionState -ne 1) {
+    Write-Host "Backup not in Protected state. Current state: $($backupItem.ProtectionState). Skipping."
     return
 }
 
