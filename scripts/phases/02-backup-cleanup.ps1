@@ -49,14 +49,22 @@ if (-not $backupItem) {
 Write-Host "Backup found in vault: $($vaultFound.Name)"
 
 # Export Backup Policy
-$policy = Get-AzRecoveryServicesBackupProtectionPolicy `
-    -Name $backupItem.PolicyName `
-    -WorkloadType AzureVM
+Write-Host "Retrieving backup policy..."
+
+$allPolicies = Get-AzRecoveryServicesBackupProtectionPolicy
+
+$policy = $allPolicies | Where-Object {
+    $_.Id -eq $backupItem.PolicyId
+}
+
+if (-not $policy) {
+    throw "Could not resolve backup policy from PolicyId."
+}
 
 $policyExportPath = "$PSScriptRoot/../../config/exported-policy-$VMName.json"
 
 Write-Host "Exporting backup policy to $policyExportPath"
-$policy | ConvertTo-Json -Depth 10 | Out-File $policyExportPath
+$policy | ConvertTo-Json -Depth 20 | Out-File $policyExportPath
 
 # Disable Protection and Remove Recovery Points
 Write-Host "Disabling backup and removing recovery points..."
