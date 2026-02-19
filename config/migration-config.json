@@ -4,4 +4,5 @@
   "resourceGroup": "Dev-RG",
   "vmName": "ubuntu",
   "destinationRegion": "centralindia"
+  "sourceVaultName": "ubuntu1"
 }
