@@ -40,17 +40,16 @@ Write-Host "VM ARM ID: $vmId"
 # -------------------------------------------------------
 # 4. Locate Active Backup Item (Standard + Enhanced Safe)
 # -------------------------------------------------------
-Write-Host "Locating active protected backup item..."
-
-$containers = Get-AzRecoveryServicesBackupContainer -ContainerType AzureVM -ErrorAction Stop
+Write-Host "Locating active protected backup item (no container type filter)..."
 
 $backupItem = $null
+
+$containers = Get-AzRecoveryServicesBackupContainer -ErrorAction Stop
 
 foreach ($container in $containers) {
 
     $items = Get-AzRecoveryServicesBackupItem `
         -Container $container `
-        -WorkloadType AzureVM `
         -ErrorAction SilentlyContinue
 
     foreach ($item in $items) {
@@ -65,11 +64,11 @@ foreach ($container in $containers) {
 }
 
 if (-not $backupItem) {
-    Write-Host "No ACTIVE protected backup item found. Skipping backup cleanup."
+    Write-Host "NO ACTIVE protected backup item found. Skipping backup cleanup."
     return
 }
 
-Write-Host "Active backup item located."
+Write-Host "Active protected backup item located."
 
 # -------------------------------------------------------
 # 5. Resolve Policy (Supports Standard + Enhanced)
