@@ -15,7 +15,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Read Config
-        id: config
         run: |
           echo "SOURCE_SUB=$(jq -r .sourceSubscription config/migration-config.json)" >> $GITHUB_ENV
           echo "DEST_SUB=$(jq -r .destinationSubscription config/migration-config.json)" >> $GITHUB_ENV
@@ -31,11 +30,6 @@ jobs:
           subscription-id: ${{ env.SOURCE_SUB }}
           enable-AzPSSession: true
 
-      - name: Install Az Module
-        shell: pwsh
-        run: |
-          Install-Module Az -Scope CurrentUser -Force
-
       - name: Run Script
         shell: pwsh
         run: |
@@ -43,13 +37,13 @@ jobs:
             -SourceSubscription "$env:SOURCE_SUB" `
             -DestinationSubscription "$env:DEST_SUB" `
             -ResourceGroup "$env:RG" `
-            -VMName "$env:VM"
+            -VMName "$env:VM" `
             -SourceVaultName "$env:VAULT"
 
       - name: Upload Backup Policy Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-         name: backup-policy-${{ env.VM }}
-         path: ${{ runner.temp }}/exported-policy-${{ env.VM }}.json
-         if-no-files-found: ignore
+          name: backup-policy-${{ env.VM }}
+          path: ${{ runner.temp }}/exported-policy-${{ env.VM }}.json
+          if-no-files-found: ignore
