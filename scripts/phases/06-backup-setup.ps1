@@ -72,33 +72,36 @@ Write-Host "Using Policy: $($policy.Name)"
 # ------------------------------------------------------------
 # Check If Already Protected
 # ------------------------------------------------------------
-$item = Get-AzRecoveryServicesBackupItem -WorkloadType AzureVM |
+Write-Host "Checking container registration..."
+
+$container = $null
+$timeout = 600
+$elapsed = 0
+
+do {
+    Start-Sleep -Seconds 20
+
+    $container = Get-AzRecoveryServicesBackupContainer `
+        -ContainerType AzureVM `
+        -Status Registered |
         Where-Object { $_.FriendlyName -eq $VMName }
 
+    $elapsed += 20
+    Write-Host "Waiting... $elapsed sec"
+
+} while (-not $container -and $elapsed -lt $timeout)
+
+if (-not $container) {
+    throw "VM container not registered in vault."
+}
+
+# Now check protected item
+$item = Get-AzRecoveryServicesBackupItem `
+            -Container $container `
+            -WorkloadType AzureVM `
+            -ErrorAction SilentlyContinue
+
 if (-not $item) {
-
-    Write-Host "Waiting for container registration..."
-
-    $container = $null
-    $timeout = 600
-    $elapsed = 0
-
-    do {
-        Start-Sleep -Seconds 20
-
-        $container = Get-AzRecoveryServicesBackupContainer `
-            -ContainerType AzureVM `
-            -Status Registered |
-            Where-Object { $_.FriendlyName -eq $VMName }
-
-        $elapsed += 20
-        Write-Host "Waiting... $elapsed sec"
-
-    } while (-not $container -and $elapsed -lt $timeout)
-
-    if (-not $container) {
-        throw "VM container not registered in vault."
-    }
 
     Write-Host "Enabling backup..."
 
