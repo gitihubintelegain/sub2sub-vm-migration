@@ -6,106 +6,96 @@ param(
     [string]$ResourceGroup,
 
     [Parameter(Mandatory)]
-    [string]$VMName,
-
-    [Parameter(Mandatory)]
-    [string]$Location
+    [string]$VMName
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 Import-Module Az.Accounts -Force
-Import-Module Az.RecoveryServices -Force
 Import-Module Az.Compute -Force
+Import-Module Az.RecoveryServices -Force
 
-Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup (Enterprise Version)"
-Write-Host "========================================="
+Write-Host "=============================="
+Write-Host "Backup Setup - Clean Version"
+Write-Host "=============================="
 
-# ----------------------------------------------------------
-# Switch to destination subscription
-# ----------------------------------------------------------
-Write-Host "Switching subscription..."
+# ------------------------------------------------------------
+# Switch Subscription
+# ------------------------------------------------------------
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
-# ----------------------------------------------------------
-# Validate VM exists
-# ----------------------------------------------------------
-Write-Host "Validating VM..."
+# ------------------------------------------------------------
+# Validate VM
+# ------------------------------------------------------------
 $vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup -ErrorAction Stop
-$vaultLocation = $vm.Location
+$location = $vm.Location
 
-Write-Host "VM found in location: $vaultLocation"
+Write-Host "VM Found in region: $location"
 
-# ----------------------------------------------------------
-# Create or Get Recovery Services Vault
-# ----------------------------------------------------------
-$vaultName = "$VMName-backup-vault"
-
-Write-Host "Checking for existing vault..."
+# ------------------------------------------------------------
+# Get or Create Vault
+# ------------------------------------------------------------
+$vaultName = "ubuntu-vault"
 
 $vault = Get-AzRecoveryServicesVault `
+            -Name $vaultName `
             -ResourceGroupName $ResourceGroup `
-            -ErrorAction SilentlyContinue |
-         Where-Object { $_.Location -eq $vaultLocation } |
-         Select-Object -First 1
+            -ErrorAction SilentlyContinue
 
 if (-not $vault) {
-    Write-Host "No vault found. Creating new vault..."
+    Write-Host "Creating Recovery Services Vault..."
     $vault = New-AzRecoveryServicesVault `
         -Name $vaultName `
         -ResourceGroupName $ResourceGroup `
-        -Location $vaultLocation
-
-    Write-Host "Vault created: $($vault.Name)"
-} else {
-    Write-Host "Using existing vault: $($vault.Name)"
+        -Location $location
 }
 
-# ----------------------------------------------------------
-# Set vault context
-# ----------------------------------------------------------
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
-Write-Host "Waiting for vault backend provisioning..."
-Start-Sleep -Seconds 45
+Start-Sleep -Seconds 30
 
-# ----------------------------------------------------------
-# Get default Azure VM policy
-# ----------------------------------------------------------
-Write-Host "Retrieving default AzureVM policy..."
+# ------------------------------------------------------------
+# Create Custom Enhanced Policy (Daily 1AM UTC, 30 days)
+# ------------------------------------------------------------
+$policyName = "Enhanced-Daily-Policy"
 
 $policy = Get-AzRecoveryServicesBackupProtectionPolicy `
             -WorkloadType AzureVM |
-          Where-Object { $_.Name -like "*Default*" } |
-          Select-Object -First 1
+          Where-Object { $_.Name -eq $policyName }
 
 if (-not $policy) {
-    throw "Default AzureVM policy not found."
+
+    Write-Host "Creating custom Enhanced policy..."
+
+    $policy = New-AzRecoveryServicesBackupProtectionPolicy `
+        -Name $policyName `
+        -WorkloadType AzureVM `
+        -PolicySubType Enhanced
+
+    # Configure daily schedule
+    $policy.SchedulePolicy.ScheduleRunFrequency = "Daily"
+    $policy.SchedulePolicy.ScheduleRunTimes.Clear()
+    $policy.SchedulePolicy.ScheduleRunTimes.Add((Get-Date "01:00"))
+
+    # Retention 30 days
+    $policy.RetentionPolicy.DailySchedule.DurationCountInDays = 30
+
+    Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
 }
 
-Write-Host "Using policy: $($policy.Name)"
+Write-Host "Using Policy: $($policy.Name)"
 
-# ----------------------------------------------------------
-# Check if VM already protected (Idempotent logic)
-# ----------------------------------------------------------
-Write-Host "Checking if VM is already protected..."
+# ------------------------------------------------------------
+# Check If Already Protected
+# ------------------------------------------------------------
+$item = Get-AzRecoveryServicesBackupItem `
+            -WorkloadType AzureVM |
+        Where-Object { $_.FriendlyName -eq $VMName }
 
-$existingItem = Get-AzRecoveryServicesBackupItem `
-                    -WorkloadType AzureVM |
-                Where-Object { $_.FriendlyName -eq $VMName }
+if (-not $item) {
 
-if ($existingItem) {
-    Write-Host "VM is already protected. Skipping enable step."
-    $item = $existingItem
-}
-else {
-
-    # ------------------------------------------------------
-    # Wait for VM container registration
-    # ------------------------------------------------------
-    Write-Host "Discovering VM container in vault..."
+    Write-Host "Waiting for container registration..."
 
     $container = $null
     $timeout = 600
@@ -120,60 +110,41 @@ else {
             Where-Object { $_.FriendlyName -eq $VMName }
 
         $elapsed += 20
-        Write-Host "Waiting for container registration... ($elapsed sec)"
+        Write-Host "Waiting... $elapsed sec"
 
     } while (-not $container -and $elapsed -lt $timeout)
 
     if (-not $container) {
-        throw "VM container not registered in vault within expected time."
+        throw "VM container not registered in vault."
     }
 
-    Write-Host "Container discovered. Enabling protection..."
+    Write-Host "Enabling backup..."
 
     Enable-AzRecoveryServicesBackupProtection `
         -Policy $policy `
         -Container $container `
         -Confirm:$false
 
-    Write-Host "Backup enable initiated."
+    # Wait for protected item
+    Start-Sleep -Seconds 40
 
-    # ------------------------------------------------------
-    # Wait for protected item creation
-    # ------------------------------------------------------
-    Write-Host "Waiting for protected item..."
-
-    $timeout = 600
-    $elapsed = 0
-    $item = $null
-
-    do {
-        Start-Sleep -Seconds 20
-        $item = Get-AzRecoveryServicesBackupItem `
-                    -Container $container `
-                    -WorkloadType AzureVM
-        $elapsed += 20
-        Write-Host "Waiting for protection confirmation... ($elapsed sec)"
-
-    } while (-not $item -and $elapsed -lt $timeout)
-
-    if (-not $item) {
-        throw "Protected item did not appear within expected time."
-    }
-
-    Write-Host "Protection established successfully."
+    $item = Get-AzRecoveryServicesBackupItem `
+                -Container $container `
+                -WorkloadType AzureVM
+}
+else {
+    Write-Host "VM already protected."
 }
 
-# ----------------------------------------------------------
-# Trigger initial backup
-# ----------------------------------------------------------
+# ------------------------------------------------------------
+# Trigger Initial Backup
+# ------------------------------------------------------------
 Write-Host "Triggering initial backup..."
 
 Backup-AzRecoveryServicesBackupItem `
     -Item $item `
     -Confirm:$false
 
-Write-Host "Initial backup triggered successfully."
-
-Write-Host "========================================="
+Write-Host "=================================="
 Write-Host "Backup Setup Completed Successfully"
-Write-Host "========================================="
+Write-Host "=================================="
