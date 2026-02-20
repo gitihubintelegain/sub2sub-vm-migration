@@ -41,7 +41,8 @@ Write-Host "VM Location: $($vm.Location)"
 # -------------------------------------------------------
 
 $nicId = $vm.NetworkProfile.NetworkInterfaces[0].Id
-$nic = Get-AzNetworkInterface -ResourceId $nicId -ErrorAction Stop
+$nicName = ($nicId -split "/")[-1]
+$nic = Get-AzNetworkInterface -Name $nicName -ResourceGroupName $ResourceGroup -ErrorAction Stop
 
 Write-Host "Primary NIC: $($nic.Name)"
 
