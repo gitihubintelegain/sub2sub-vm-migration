@@ -15,6 +15,7 @@ on:
           - prepare
           - move
           - post
+          - backupsetup
 
 permissions:
   id-token: write
