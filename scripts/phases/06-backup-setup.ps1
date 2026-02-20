@@ -42,6 +42,10 @@ Set-AzRecoveryServicesVaultContext -Vault $vault
 # 2. Create Backup Policy (Enhanced Model - Az 15+ Safe)
 # -------------------------------------------------------
 
+# -------------------------------------------------------
+# 2. Create Backup Policy (Enhanced Model - 2026 Safe)
+# -------------------------------------------------------
+
 $policyName = "$VMName-policy"
 
 $existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy `
@@ -67,7 +71,6 @@ if (-not $existingPolicy) {
 
     # Commit changes
     Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
-
 }
 else {
     Write-Host "Policy already exists."
