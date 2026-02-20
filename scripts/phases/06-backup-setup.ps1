@@ -1,3 +1,6 @@
+Import-Module Az.RecoveryServices -Force
+Import-Module Az.Compute -Force
+
 param(
     [Parameter(Mandatory)]
     [string]$DestinationSubscription,
@@ -15,11 +18,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-Import-Module Az.RecoveryServices -Force
-Import-Module Az.Compute -Force
-
 Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup (Az 15.3.0 Corrected)"
+Write-Host "Phase 6 - Backup Setup (Final Clean)"
 Write-Host "========================================="
 
 # Switch subscription
@@ -36,9 +36,11 @@ $vault = New-AzRecoveryServicesVault `
     -ResourceGroupName $ResourceGroup `
     -Location $Location
 
+# Set vault context
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
-Start-Sleep -Seconds 20
+# Wait for vault backend provisioning
+Start-Sleep -Seconds 30
 
 # Get default AzureVM policy
 Write-Host "Retrieving default AzureVM policy..."
@@ -54,56 +56,32 @@ if (-not $policy) {
 
 Write-Host "Using policy: $($policy.Name)"
 
-# Get VM
-$vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
-
-# Register VM container (FIXED LINE)
-Write-Host "Registering VM container..."
-
-Register-AzRecoveryServicesBackupContainer `
-    -BackupManagementType AzureWorkload `
-    -WorkloadType AzureVM `
-    -ResourceId $vm.Id | Out-Null
-
-Write-Host "Waiting for container discovery..."
-
-$timeout = 240
-$elapsed = 0
-$container = $null
-
-do {
-    Start-Sleep -Seconds 15
-    $container = Get-AzRecoveryServicesBackupContainer `
-        -ContainerType AzureVM `
-        -FriendlyName $VMName `
-        -ErrorAction SilentlyContinue
-    $elapsed += 15
-} while (-not $container -and $elapsed -lt $timeout)
-
-if (-not $container) {
-    throw "VM container registration failed or timed out."
-}
-
-Write-Host "Container registered."
-
-# Enable protection
+# Enable protection (THIS handles container registration internally)
 Write-Host "Enabling backup for VM..."
 
 Enable-AzRecoveryServicesBackupProtection `
     -Policy $policy `
     -Name $VMName `
-    -ResourceGroupName $ResourceGroup
+    -ResourceGroupName $ResourceGroup `
+    -Confirm:$false
 
 Write-Host "Backup enable initiated."
 
-Start-Sleep -Seconds 20
+# Wait for protected item to appear
+$timeout = 240
+$elapsed = 0
+$item = $null
 
-$item = Get-AzRecoveryServicesBackupItem `
-    -Container $container `
-    -WorkloadType AzureVM
+do {
+    Start-Sleep -Seconds 15
+    $item = Get-AzRecoveryServicesBackupItem `
+        -WorkloadType AzureVM |
+        Where-Object { $_.Name -eq $VMName }
+    $elapsed += 15
+} while (-not $item -and $elapsed -lt $timeout)
 
 if (-not $item) {
-    throw "Protected item not found."
+    throw "Protected item did not appear within expected time."
 }
 
 Write-Host "Protection established."
@@ -111,7 +89,7 @@ Write-Host "Protection established."
 # Trigger initial backup
 Write-Host "Triggering initial backup..."
 
-Backup-AzRecoveryServicesBackupItem -Item $item
+Backup-AzRecoveryServicesBackupItem -Item $item -Confirm:$false
 
 Write-Host "Initial backup triggered successfully."
 
