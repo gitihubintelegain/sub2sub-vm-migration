@@ -1,3 +1,6 @@
+Import-Module Az.RecoveryServices -Force
+Import-Module Az.Compute -Force
+
 param(
     [Parameter(Mandatory)]
     [string]$DestinationSubscription,
@@ -15,99 +18,108 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-Import-Module Az.Accounts -Force
-Import-Module Az.Resources -Force
-Import-Module Az.Compute -Force
-Import-Module Az.RecoveryServices -Force
-
 Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup (REST Based)"
+Write-Host "Phase 6 - Backup Setup (Az 15.3.0 Stable)"
 Write-Host "========================================="
 
 # -------------------------------------------------------
 # Switch Subscription
 # -------------------------------------------------------
-
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
 # -------------------------------------------------------
 # Create Vault
 # -------------------------------------------------------
-
 $uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
 $vaultName = "$VMName-vault-$uniqueSuffix"
 
 Write-Host "Creating Recovery Services Vault: $vaultName"
 
-New-AzRecoveryServicesVault `
+$vault = New-AzRecoveryServicesVault `
     -Name $vaultName `
     -ResourceGroupName $ResourceGroup `
-    -Location $Location | Out-Null
+    -Location $Location
+
+# CRITICAL
+Set-AzRecoveryServicesVaultContext -Vault $vault
 
 # -------------------------------------------------------
-# Create Backup Policy via REST
+# Create Policy (Enhanced default model)
 # -------------------------------------------------------
+
+Write-Host "Preparing schedule and retention policy..."
+
+$schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject `
+    -WorkloadType AzureVM
+
+$retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject `
+    -WorkloadType AzureVM
+
+# SAFE modification (retention only)
+$retentionPolicy.DailySchedule.DurationCountInDays = 7
 
 $policyName = "$VMName-policy"
 
-$policyUri = "/subscriptions/$DestinationSubscription/resourceGroups/$ResourceGroup/providers/Microsoft.RecoveryServices/vaults/$vaultName/backupPolicies/$($policyName)?api-version=2023-02-01"
+Write-Host "Creating backup policy..."
 
-$time = (Get-Date "2026-01-01T11:00:00Z").ToString("o")
-
-$policyBody = @{
-    properties = @{
-        backupManagementType = "AzureIaasVM"
-        schedulePolicy = @{
-            schedulePolicyType = "SimpleSchedulePolicy"
-            scheduleRunFrequency = "Daily"
-            scheduleRunTimes = @($time)
-        }
-        retentionPolicy = @{
-            retentionPolicyType = "SimpleRetentionPolicy"
-            dailySchedule = @{
-                retentionTimes = @($time)
-                retentionDuration = @{
-                    count = 7
-                    durationType = "Days"
-                }
-            }
-        }
-    }
-} | ConvertTo-Json -Depth 10
-
-Write-Host "Creating backup policy via REST..."
-
-Invoke-AzRestMethod `
-    -Method PUT `
-    -Path $policyUri `
-    -Payload $policyBody | Out-Null
+$policy = New-AzRecoveryServicesBackupProtectionPolicy `
+    -Name $policyName `
+    -WorkloadType AzureVM `
+    -SchedulePolicy $schedulePolicy `
+    -RetentionPolicy $retentionPolicy
 
 Write-Host "Policy created."
 
 # -------------------------------------------------------
-# Enable Backup via REST
+# Enable Backup (Handles container registration internally)
 # -------------------------------------------------------
 
-$vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
+Write-Host "Enabling backup for VM..."
 
-$containerUri = "/subscriptions/$DestinationSubscription/resourceGroups/$ResourceGroup/providers/Microsoft.RecoveryServices/vaults/$vaultName/backupFabrics/Azure/protectionContainers/IaasVMContainer;iaasvmcontainerv2;$($ResourceGroup);$($VMName)/protectedItems/VM;iaasvmcontainerv2;$($ResourceGroup);$($VMName)?api-version=2023-02-01"
+Enable-AzRecoveryServicesBackupProtection `
+    -Policy $policy `
+    -Name $VMName `
+    -ResourceGroupName $ResourceGroup
 
-$enableBody = @{
-    properties = @{
-        protectedItemType = "Microsoft.Compute/virtualMachines"
-        policyId = "/subscriptions/$DestinationSubscription/resourceGroups/$ResourceGroup/providers/Microsoft.RecoveryServices/vaults/$vaultName/backupPolicies/$($policyName)"
-        sourceResourceId = $vm.Id
-    }
-} | ConvertTo-Json -Depth 10
+Write-Host "Backup enable initiated."
 
-Write-Host "Enabling backup via REST..."
+# -------------------------------------------------------
+# Wait for container registration
+# -------------------------------------------------------
 
-Invoke-AzRestMethod `
-    -Method PUT `
-    -Path $containerUri `
-    -Payload $enableBody | Out-Null
+Write-Host "Waiting for VM container registration..."
 
-Write-Host "Backup enabled successfully."
+$timeout = 120
+$elapsed = 0
+
+do {
+    Start-Sleep -Seconds 10
+    $container = Get-AzRecoveryServicesBackupContainer `
+        -ContainerType AzureVM `
+        -FriendlyName $VMName `
+        -ErrorAction SilentlyContinue
+    $elapsed += 10
+} while (-not $container -and $elapsed -lt $timeout)
+
+if (-not $container) {
+    throw "VM container registration did not complete in expected time."
+}
+
+Write-Host "Container registered."
+
+# -------------------------------------------------------
+# Trigger Initial Backup
+# -------------------------------------------------------
+
+$item = Get-AzRecoveryServicesBackupItem `
+    -Container $container `
+    -WorkloadType AzureVM
+
+Write-Host "Triggering initial backup..."
+
+Backup-AzRecoveryServicesBackupItem -Item $item
+
+Write-Host "Initial backup triggered successfully."
 
 Write-Host "========================================="
 Write-Host "Backup Setup Completed Successfully"
