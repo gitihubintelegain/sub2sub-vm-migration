@@ -87,3 +87,28 @@ do {
 } while ($updatedItem -and $updatedItem.ProtectionState -eq "Protected" -and $retry -lt $maxRetries)
 
 Write-Host "Backup successfully disabled."
+
+Write-Host "Searching for Restore Point Collections..."
+
+# Find AzureBackup resource groups
+$backupRGs = Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like "AzureBackupRG_*" }
+
+foreach ($brg in $backupRGs) {
+
+    Write-Host "Checking Restore Point Collections in RG: $($brg.ResourceGroupName)"
+
+    $rpcList = Get-AzRestorePointCollection -ResourceGroupName $brg.ResourceGroupName -ErrorAction SilentlyContinue
+
+    foreach ($rpc in $rpcList) {
+
+        if ($rpc.Source.Id -eq $vm.Id) {
+
+            Write-Host "Deleting Restore Point Collection: $($rpc.Name)"
+
+            Remove-AzRestorePointCollection `
+                -ResourceGroupName $brg.ResourceGroupName `
+                -Name $rpc.Name `
+                -Force
+        }
+    }
+}
