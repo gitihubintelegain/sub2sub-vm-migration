@@ -1,3 +1,6 @@
+Import-Module Az.RecoveryServices -Force
+Import-Module Az.Compute -Force
+
 param(
     [Parameter(Mandatory)]
     [string]$DestinationSubscription,
@@ -12,17 +15,24 @@ param(
     [string]$Location
 )
 
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
 Write-Host "========================================="
 Write-Host "Phase 6 - Backup Setup"
 Write-Host "========================================="
 
-Set-AzContext -SubscriptionId $DestinationSubscription -ErrorAction Stop | Out-Null
-
 # -------------------------------------------------------
-# 1. Create Unique Vault Name
+# 1. Switch Subscription
 # -------------------------------------------------------
 
-$uniqueSuffix = (Get-Date -Format "yyyyMMddHHmmss")
+Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
+
+# -------------------------------------------------------
+# 2. Create Unique Vault
+# -------------------------------------------------------
+
+$uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
 $vaultName = "$VMName-vault-$uniqueSuffix"
 
 Write-Host "Creating Recovery Services Vault: $vaultName"
@@ -34,51 +44,40 @@ $vault = New-AzRecoveryServicesVault `
 
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
-# -------------------------------------------------------
-# 2. Create Backup Policy (Daily 11 AM, 7 days retention)
-# -------------------------------------------------------
+# OPTIONAL (recommended to avoid future migration blocks)
+Update-AzRecoveryServicesVault `
+    -Vault $vault `
+    -SoftDeleteFeatureState Disable `
+    -Confirm:$false
 
 # -------------------------------------------------------
-# 2. Create Backup Policy (Enhanced Model - Az 15+ Safe)
-# -------------------------------------------------------
-
-# -------------------------------------------------------
-# 2. Create Backup Policy (Enhanced Model - 2026 Safe)
+# 3. Create Enhanced Backup Policy (Az 15+ Safe)
 # -------------------------------------------------------
 
 $policyName = "$VMName-policy"
 
-$existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy `
+Write-Host "Creating Enhanced backup policy..."
+
+# Create default Enhanced policy
+$policy = New-AzRecoveryServicesBackupProtectionPolicy `
     -Name $policyName `
-    -ErrorAction SilentlyContinue
+    -WorkloadType AzureVM
 
-if (-not $existingPolicy) {
+# Modify schedule
+$policy.SchedulePolicy.ScheduleRunFrequency = "Daily"
+$policy.SchedulePolicy.ScheduleRunTimes = @((Get-Date "11:00"))
 
-    Write-Host "Creating Enhanced backup policy..."
+# Modify retention
+$policy.RetentionPolicy.DailySchedule.DurationCountInDays = 7
+$policy.RetentionPolicy.DailySchedule.RetentionTimes = @((Get-Date "11:00"))
 
-    # Create default Enhanced policy
-    $policy = New-AzRecoveryServicesBackupProtectionPolicy `
-        -Name $policyName `
-        -WorkloadType AzureVM
+# Commit changes
+Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
 
-    # Modify schedule (Daily 11 AM)
-    $policy.SchedulePolicy.ScheduleRunFrequency = "Daily"
-    $policy.SchedulePolicy.ScheduleRunTimes = @((Get-Date "11:00"))
-
-    # Modify retention (7 days)
-    $policy.RetentionPolicy.DailySchedule.DurationCountInDays = 7
-    $policy.RetentionPolicy.DailySchedule.RetentionTimes = @((Get-Date "11:00"))
-
-    # Commit changes
-    Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
-}
-else {
-    Write-Host "Policy already exists."
-    $policy = $existingPolicy
-}
+Write-Host "Backup policy created."
 
 # -------------------------------------------------------
-# 3. Enable Backup
+# 4. Enable Backup
 # -------------------------------------------------------
 
 Write-Host "Enabling backup for VM..."
@@ -91,8 +90,10 @@ Enable-AzRecoveryServicesBackupProtection `
 Write-Host "Backup enabled."
 
 # -------------------------------------------------------
-# 4. Trigger Initial Backup
+# 5. Trigger Initial Backup
 # -------------------------------------------------------
+
+Write-Host "Retrieving container..."
 
 $container = Get-AzRecoveryServicesBackupContainer `
     -ContainerType AzureVM `
@@ -109,5 +110,5 @@ Backup-AzRecoveryServicesBackupItem -Item $item
 Write-Host "Initial backup triggered successfully."
 
 Write-Host "========================================="
-Write-Host "Backup Setup Completed"
+Write-Host "Backup Setup Completed Successfully"
 Write-Host "========================================="
