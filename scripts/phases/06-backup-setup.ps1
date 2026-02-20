@@ -87,7 +87,7 @@ Write-Host "Using Policy: $($policy.Name)"
 Write-Host "Waiting for container registration..."
 
 $container = $null
-$timeout = 600
+$timeout = 120
 $elapsed = 0
 
 do {
