@@ -50,9 +50,6 @@ jobs:
           Install-Module Az -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
           Import-Module Az -Force
 
-      # -----------------------------
-      # Run PowerShell for all except backupsetup
-      # -----------------------------
       - name: Run PowerShell Phases
         if: ${{ github.event.inputs.phase != 'backupsetup' }}
         shell: pwsh
@@ -65,9 +62,6 @@ jobs:
             -SourceVaultName "$env:VAULT" `
             -Phase "${{ github.event.inputs.phase }}"
 
-      # -----------------------------
-      # Terraform Backup Phase
-      # -----------------------------
       - name: Get VM ID
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
         id: get_vm
@@ -98,8 +92,8 @@ jobs:
         working-directory: terraform
         run: |
           terraform apply -auto-approve \
-            -var="vm_name=$env:VM" \
-            -var="resource_group=$env:RG" \
+            -var="vm_name=${{ env.VM }}" \
+            -var="resource_group=${{ env.RG }}" \
             -var="location=centralindia" \
             -var="vm_id=${{ steps.get_vm.outputs.vm_id }}" \
             -var="unique_suffix=${{ steps.suffix.outputs.suffix }}"
