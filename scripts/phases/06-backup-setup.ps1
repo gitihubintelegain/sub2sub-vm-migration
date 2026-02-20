@@ -44,12 +44,6 @@ $vault = New-AzRecoveryServicesVault `
 
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
-# Disable soft delete for automation safety
-Update-AzRecoveryServicesVault `
-    -Vault $vault `
-    -SoftDeleteFeatureState Disable `
-    -Confirm:$false
-
 # -------------------------------------------------------
 # 3. Create STANDARD Backup Policy
 # -------------------------------------------------------
