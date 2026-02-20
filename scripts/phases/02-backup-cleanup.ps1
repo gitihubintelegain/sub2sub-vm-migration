@@ -25,8 +25,8 @@ Write-Host "Locating backup container..."
 
 $container = Get-AzRecoveryServicesBackupContainer `
     -ContainerType AzureVM `
-    -Status Registered `
-    | Where-Object { $_.FriendlyName -eq $VMName }
+    -FriendlyName $VMName `
+    -ErrorAction SilentlyContinue
 
 if (-not $container) {
     Write-Host "No registered backup container found for VM."
