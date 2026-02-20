@@ -103,7 +103,9 @@ foreach ($brg in $backupRGs) {
 
     foreach ($rpc in $rpcResources) {
 
-        if ($rpc.Properties.source.id -eq $vm.Id) {
+        Write-Host "Found RPC: $($rpc.Name)"
+
+        if ($rpc.Name -like "AzureBackup_$VMName*") {
 
             Write-Host "Deleting RPC: $($rpc.Name)"
 
