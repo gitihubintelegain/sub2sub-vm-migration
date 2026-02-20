@@ -15,21 +15,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup (2026 Safe)"
-Write-Host "========================================="
-
-Import-Module Az.RecoveryServices -Force
+Import-Module Az.Accounts -Force
+Import-Module Az.Resources -Force
 Import-Module Az.Compute -Force
 
-# -------------------------------------------------------
-# 1. Switch Subscription
-# -------------------------------------------------------
+Write-Host "========================================="
+Write-Host "Phase 6 - Backup Setup (REST Based)"
+Write-Host "========================================="
 
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
 # -------------------------------------------------------
-# 2. Create Recovery Services Vault (Unique)
+# 1. Create Vault
 # -------------------------------------------------------
 
 $uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
@@ -42,57 +39,68 @@ $vault = New-AzRecoveryServicesVault `
     -ResourceGroupName $ResourceGroup `
     -Location $Location
 
-Set-AzRecoveryServicesVaultContext -Vault $vault
-
 # -------------------------------------------------------
-# 3. Create Enhanced Default Backup Policy
+# 2. Create Backup Policy via REST
 # -------------------------------------------------------
 
 $policyName = "$VMName-policy"
 
-Write-Host "Creating Enhanced backup policy..."
+$policyUri = "/subscriptions/$DestinationSubscription/resourceGroups/$ResourceGroup/providers/Microsoft.RecoveryServices/vaults/$vaultName/backupPolicies/$policyName?api-version=2023-02-01"
 
-$policy = New-AzRecoveryServicesBackupProtectionPolicy `
-    -Name $policyName `
-    -WorkloadType AzureVM
+$policyBody = @{
+    properties = @{
+        backupManagementType = "AzureIaasVM"
+        schedulePolicy = @{
+            schedulePolicyType = "SimpleSchedulePolicy"
+            scheduleRunFrequency = "Daily"
+            scheduleRunTimes = @((Get-Date "2026-01-01T11:00:00Z").ToString("o"))
+        }
+        retentionPolicy = @{
+            retentionPolicyType = "SimpleRetentionPolicy"
+            dailySchedule = @{
+                retentionTimes = @((Get-Date "2026-01-01T11:00:00Z").ToString("o"))
+                retentionDuration = @{
+                    count = 7
+                    durationType = "Days"
+                }
+            }
+        }
+    }
+} | ConvertTo-Json -Depth 10
 
-# Modify retention only (supported operation)
-$policy.RetentionPolicy.DailySchedule.DurationCountInDays = 7
+Write-Host "Creating backup policy via REST..."
 
-Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
+Invoke-AzRestMethod `
+    -Method PUT `
+    -Path $policyUri `
+    -Payload $policyBody
 
-Write-Host "Backup policy created."
+Write-Host "Policy created."
 
 # -------------------------------------------------------
-# 4. Enable Backup for VM
+# 3. Enable Backup
 # -------------------------------------------------------
 
-Write-Host "Enabling backup..."
+$vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
 
-Enable-AzRecoveryServicesBackupProtection `
-    -Policy $policy `
-    -Name $VMName `
-    -ResourceGroupName $ResourceGroup
+$containerUri = "/subscriptions/$DestinationSubscription/resourceGroups/$ResourceGroup/providers/Microsoft.RecoveryServices/vaults/$vaultName/backupFabrics/Azure/protectionContainers/IaasVMContainer;iaasvmcontainerv2;$ResourceGroup;$VMName/protectedItems/VM;iaasvmcontainerv2;$ResourceGroup;$VMName?api-version=2023-02-01"
+
+$enableBody = @{
+    properties = @{
+        protectedItemType = "Microsoft.Compute/virtualMachines"
+        policyId = "/subscriptions/$DestinationSubscription/resourceGroups/$ResourceGroup/providers/Microsoft.RecoveryServices/vaults/$vaultName/backupPolicies/$policyName"
+        sourceResourceId = $vm.Id
+    }
+} | ConvertTo-Json -Depth 10
+
+Write-Host "Enabling backup via REST..."
+
+Invoke-AzRestMethod `
+    -Method PUT `
+    -Path $containerUri `
+    -Payload $enableBody
 
 Write-Host "Backup enabled."
-
-# -------------------------------------------------------
-# 5. Trigger Initial Backup
-# -------------------------------------------------------
-
-Write-Host "Triggering initial backup..."
-
-$container = Get-AzRecoveryServicesBackupContainer `
-    -ContainerType AzureVM `
-    -FriendlyName $VMName
-
-$item = Get-AzRecoveryServicesBackupItem `
-    -Container $container `
-    -WorkloadType AzureVM
-
-Backup-AzRecoveryServicesBackupItem -Item $item
-
-Write-Host "Initial backup triggered successfully."
 
 Write-Host "========================================="
 Write-Host "Backup Setup Completed Successfully"
