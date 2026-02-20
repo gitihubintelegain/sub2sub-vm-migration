@@ -16,7 +16,14 @@ Write-Host "========================================="
 Write-Host "Phase 5 - Post Move Finalization"
 Write-Host "========================================="
 
-Set-AzContext -SubscriptionId $DestinationSubscription -ErrorAction Stop
+# Ensure module is available (GitHub runner safe)
+if (-not (Get-Module -ListAvailable -Name Az.RecoveryServices)) {
+    Install-Module Az.RecoveryServices -Scope CurrentUser -Force -AllowClobber
+}
+
+Import-Module Az.RecoveryServices -Force
+
+Set-AzContext -SubscriptionId $DestinationSubscription -ErrorAction Stop | Out-Null
 
 # -------------------------------------------------------
 # 1. Get VM + NIC
@@ -29,7 +36,7 @@ $nicName = ($nicId -split "/")[-1]
 $nic = Get-AzNetworkInterface -Name $nicName -ResourceGroupName $ResourceGroup
 
 # -------------------------------------------------------
-# 2. Re-attach Public IP (if exists)
+# 2. Re-attach Public IP
 # -------------------------------------------------------
 
 $pip = Get-AzPublicIpAddress -ResourceGroupName $ResourceGroup -ErrorAction SilentlyContinue |
@@ -37,9 +44,8 @@ $pip = Get-AzPublicIpAddress -ResourceGroupName $ResourceGroup -ErrorAction Sile
 
 if ($pip) {
     Write-Host "Re-attaching Public IP: $($pip.Name)"
-
     $nic.IpConfigurations[0].PublicIpAddress = $pip
-    Set-AzNetworkInterface -NetworkInterface $nic
+    Set-AzNetworkInterface -NetworkInterface $nic | Out-Null
 }
 else {
     Write-Host "No Public IP found to reattach."
@@ -50,7 +56,7 @@ else {
 # -------------------------------------------------------
 
 Write-Host "Starting VM..."
-Start-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
+Start-AzVM -Name $VMName -ResourceGroupName $ResourceGroup | Out-Null
 Write-Host "VM started."
 
 # -------------------------------------------------------
@@ -72,7 +78,7 @@ if (-not $vault) {
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
 # -------------------------------------------------------
-# 5. Create Backup Policy (7 days retention, 5 days instant restore, daily 11 AM)
+# 5. Create Backup Policy (7 days retention, daily 11 AM)
 # -------------------------------------------------------
 
 $policyName = "$VMName-policy"
@@ -85,11 +91,13 @@ if (-not $policy) {
 
     Write-Host "Creating backup policy..."
 
+    # Schedule
     $schedulePolicy = New-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
     $schedulePolicy.ScheduleRunFrequency = "Daily"
     $schedulePolicy.ScheduleRunTimes.Clear()
     $schedulePolicy.ScheduleRunTimes.Add((Get-Date "11:00"))
 
+    # Retention
     $retentionPolicy = New-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
     $retentionPolicy.DailySchedule.DurationCountInDays = 7
     $retentionPolicy.DailySchedule.RetentionTimes.Clear()
@@ -111,7 +119,8 @@ Write-Host "Enabling backup for VM..."
 Enable-AzRecoveryServicesBackupProtection `
     -Policy $policy `
     -Name $VMName `
-    -ResourceGroupName $ResourceGroup
+    -ResourceGroupName $ResourceGroup `
+    -Force
 
 # -------------------------------------------------------
 # 7. Trigger Initial Backup
@@ -127,7 +136,7 @@ $item = Get-AzRecoveryServicesBackupItem `
 
 Write-Host "Triggering initial backup..."
 
-Backup-AzRecoveryServicesBackupItem -Item $item
+Backup-AzRecoveryServicesBackupItem -Item $item | Out-Null
 
 Write-Host "Initial backup triggered successfully."
 
