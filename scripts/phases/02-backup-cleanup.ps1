@@ -47,7 +47,7 @@ if (-not $backupItem) {
     return
 }
 
-if ($backupItem.ProtectionState -ne 1) {
+if ($backupItem.ProtectionState -ne "Protected") {
     Write-Host "Backup exists but not in Protected state. Current state: $($backupItem.ProtectionState)"
     return
 }
