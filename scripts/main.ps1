@@ -15,7 +15,7 @@ param(
     [string]$SourceVaultName,
 
     [Parameter(Mandatory)]
-    [ValidateSet("all","validate","backup","prepare","move")]
+    [ValidateSet("all","validate","backup","prepare","move,"post")]
     [string]$Phase
 )
 
