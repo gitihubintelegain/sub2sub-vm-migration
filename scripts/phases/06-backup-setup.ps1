@@ -1,6 +1,3 @@
-Import-Module Az.RecoveryServices -Force
-Import-Module Az.Compute -Force
-
 param(
     [Parameter(Mandatory)]
     [string]$DestinationSubscription,
@@ -21,6 +18,9 @@ $ErrorActionPreference = "Stop"
 Write-Host "========================================="
 Write-Host "Phase 6 - Backup Setup (Az 15.3.0 Stable)"
 Write-Host "========================================="
+
+Import-Module Az.RecoveryServices -Force
+Import-Module Az.Compute -Force
 
 # -------------------------------------------------------
 # Switch Subscription
