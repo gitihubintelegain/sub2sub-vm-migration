@@ -38,10 +38,6 @@ Set-AzRecoveryServicesVaultContext -Vault $vault
 # 2. Create Backup Policy (Daily 11 AM, 7 days retention)
 # -------------------------------------------------------
 
-# -------------------------------------------------------
-# 2. Create Backup Policy (Daily 11 AM, 7 days retention)
-# -------------------------------------------------------
-
 $policyName = "$VMName-policy"
 
 $existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy `
@@ -50,28 +46,25 @@ $existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy `
 
 if (-not $existingPolicy) {
 
-    Write-Host "Creating backup policy..."
+    Write-Host "Creating backup policy (Az 15+ compatible)..."
 
-    # Get default templates
+    # Get default objects
     $schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
     $retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
 
-    # Configure schedule
+    # Schedule
     $schedulePolicy.ScheduleRunFrequency = "Daily"
-    $schedulePolicy.ScheduleRunTimes.Clear()
-    $schedulePolicy.ScheduleRunTimes.Add((Get-Date "11:00"))
+    $schedulePolicy.ScheduleRunTime = (Get-Date "11:00")
 
-    # Configure retention
+    # Retention
     $retentionPolicy.DailySchedule.DurationCountInDays = 7
-    $retentionPolicy.DailySchedule.RetentionTimes.Clear()
-    $retentionPolicy.DailySchedule.RetentionTimes.Add((Get-Date "11:00"))
+    $retentionPolicy.DailySchedule.RetentionTime = (Get-Date "11:00")
 
     $policy = New-AzRecoveryServicesBackupProtectionPolicy `
         -Name $policyName `
         -WorkloadType AzureVM `
         -SchedulePolicy $schedulePolicy `
         -RetentionPolicy $retentionPolicy
-
 }
 else {
     Write-Host "Policy already exists."
