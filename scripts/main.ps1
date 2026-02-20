@@ -15,7 +15,7 @@ param(
     [string]$SourceVaultName,
 
     [Parameter(Mandatory)]
-    [ValidateSet("all","validate","backup","prepare","move,"post")]
+    [ValidateSet("all","validate","backup","prepare","move","post")]
     [string]$Phase
 )
 
@@ -23,10 +23,12 @@ Write-Host "========================================="
 Write-Host "Sub2Sub VM Migration - Phase: $Phase"
 Write-Host "========================================="
 
+$resourcesToMove = $null
+
 # -------------------------
 # Phase 1 - Validation
 # -------------------------
-if ($Phase -eq "validate" -or $Phase -eq "all") {
+if ($Phase -in @("validate","all")) {
 
     Write-Host "Phase 1 - Validation"
 
@@ -41,7 +43,7 @@ if ($Phase -eq "validate" -or $Phase -eq "all") {
 # -------------------------
 # Phase 2 - Backup Cleanup
 # -------------------------
-if ($Phase -eq "backup" -or $Phase -eq "all") {
+if ($Phase -in @("backup","all")) {
 
     Write-Host "Phase 2 - Backup Cleanup"
 
@@ -55,7 +57,7 @@ if ($Phase -eq "backup" -or $Phase -eq "all") {
 # -------------------------
 # Phase 3 - Prepare
 # -------------------------
-if ($Phase -eq "prepare" -or $Phase -eq "all") {
+if ($Phase -in @("prepare","all")) {
 
     Write-Host "Phase 3 - Prepare For Move"
 
@@ -68,7 +70,7 @@ if ($Phase -eq "prepare" -or $Phase -eq "all") {
 # -------------------------
 # Phase 4 - Move
 # -------------------------
-if ($Phase -eq "move" -or $Phase -eq "all") {
+if ($Phase -in @("move","all")) {
 
     if (-not $resourcesToMove) {
         throw "ResourcesToMove is empty. Run prepare phase first or use Phase=all."
@@ -86,8 +88,7 @@ if ($Phase -eq "move" -or $Phase -eq "all") {
 # -------------------------
 # Phase 5 - Post Move
 # -------------------------
-
-if ($Phase -eq "all" -or $Phase -eq "post") {
+if ($Phase -in @("post","all")) {
 
     Write-Host "Phase 5 - Post Move"
 
