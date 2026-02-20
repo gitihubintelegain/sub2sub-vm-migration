@@ -1,5 +1,3 @@
-Import-Module Az.RecoveryServices -Force
-
 param(
     [Parameter(Mandatory)]
     [string]$DestinationSubscription,
@@ -18,14 +16,21 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup"
+Write-Host "Phase 6 - Backup Setup (Standard Policy)"
 Write-Host "========================================="
+
+Import-Module Az.RecoveryServices -Force
+Import-Module Az.Compute -Force
+
+# -------------------------------------------------------
+# 1. Switch Subscription
+# -------------------------------------------------------
 
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
-# ---------------------------------------
-# Create Vault
-# ---------------------------------------
+# -------------------------------------------------------
+# 2. Create Vault
+# -------------------------------------------------------
 
 $uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
 $vaultName = "$VMName-vault-$uniqueSuffix"
@@ -45,29 +50,40 @@ Update-AzRecoveryServicesVault `
     -SoftDeleteFeatureState Disable `
     -Confirm:$false
 
-# ---------------------------------------
-# Create Enhanced Policy (Supported Way)
-# ---------------------------------------
+# -------------------------------------------------------
+# 3. Create STANDARD Backup Policy
+# -------------------------------------------------------
 
 $policyName = "$VMName-policy"
 
-Write-Host "Creating Enhanced AzureVM backup policy..."
+Write-Host "Creating STANDARD AzureVM backup policy..."
 
+# Create Standard schedule policy object
+$schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
+
+$schedulePolicy.ScheduleRunFrequency = "Daily"
+$schedulePolicy.ScheduleRunTimes.Clear()
+$schedulePolicy.ScheduleRunTimes.Add((Get-Date "11:00"))
+
+# Create Standard retention policy object
+$retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
+
+$retentionPolicy.DailySchedule.DurationCountInDays = 7
+$retentionPolicy.DailySchedule.RetentionTimes.Clear()
+$retentionPolicy.DailySchedule.RetentionTimes.Add((Get-Date "11:00"))
+
+# Create Policy
 $policy = New-AzRecoveryServicesBackupProtectionPolicy `
     -Name $policyName `
     -WorkloadType AzureVM `
-    -PolicySubType Enhanced
+    -SchedulePolicy $schedulePolicy `
+    -RetentionPolicy $retentionPolicy
 
-# Now modify supported fields only
-$policy.RetentionPolicy.DailySchedule.DurationCountInDays = 7
+Write-Host "Standard policy created successfully."
 
-Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
-
-Write-Host "Policy created successfully."
-
-# ---------------------------------------
-# Enable Backup
-# ---------------------------------------
+# -------------------------------------------------------
+# 4. Enable Backup
+# -------------------------------------------------------
 
 Write-Host "Enabling backup..."
 
@@ -78,9 +94,11 @@ Enable-AzRecoveryServicesBackupProtection `
 
 Write-Host "Backup enabled."
 
-# ---------------------------------------
-# Trigger Initial Backup
-# ---------------------------------------
+# -------------------------------------------------------
+# 5. Trigger Initial Backup
+# -------------------------------------------------------
+
+Write-Host "Retrieving container..."
 
 $container = Get-AzRecoveryServicesBackupContainer `
     -ContainerType AzureVM `
@@ -90,9 +108,11 @@ $item = Get-AzRecoveryServicesBackupItem `
     -Container $container `
     -WorkloadType AzureVM
 
+Write-Host "Triggering initial backup..."
+
 Backup-AzRecoveryServicesBackupItem -Item $item
 
-Write-Host "Initial backup triggered."
+Write-Host "Initial backup triggered successfully."
 
 Write-Host "========================================="
 Write-Host "Backup Setup Completed Successfully"
