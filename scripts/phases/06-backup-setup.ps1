@@ -34,45 +34,57 @@ $location = $vm.Location
 Write-Host "VM Found in region: $location"
 
 # ------------------------------------------------------------
-# Get or Create Vault
+# Create Unique Vault
 # ------------------------------------------------------------
-$vaultName = "ubuntu-vault"
+$timestamp = Get-Date -Format "yyyyMMddHHmmss"
+$vaultName = "$VMName-vault-$timestamp"
 
-$vault = Get-AzRecoveryServicesVault `
-            -Name $vaultName `
-            -ResourceGroupName $ResourceGroup `
-            -ErrorAction SilentlyContinue
+Write-Host "Creating Recovery Services Vault: $vaultName"
 
-if (-not $vault) {
-    Write-Host "Creating Recovery Services Vault..."
-    $vault = New-AzRecoveryServicesVault `
-        -Name $vaultName `
-        -ResourceGroupName $ResourceGroup `
-        -Location $location
-}
+$vault = New-AzRecoveryServicesVault `
+    -Name $vaultName `
+    -ResourceGroupName $ResourceGroup `
+    -Location $location
 
 Set-AzRecoveryServicesVaultContext -Vault $vault
-Start-Sleep -Seconds 30
+
+Write-Host "Waiting for vault backend initialization..."
+Start-Sleep -Seconds 60
 
 # ------------------------------------------------------------
-# Get Existing Enhanced Policy (DO NOT CREATE NEW)
+# Get Existing Enhanced Policy (auto-created by Azure)
 # ------------------------------------------------------------
-Write-Host "Getting existing Enhanced policy..."
+Write-Host "Retrieving Enhanced policy..."
 
-$policy = Get-AzRecoveryServicesBackupProtectionPolicy -WorkloadType AzureVM |
-          Where-Object { $_.Name -like "*Enhanced*" } |
-          Select-Object -First 1
+$policy = $null
+$timeout = 300
+$elapsed = 0
+
+do {
+    Start-Sleep -Seconds 15
+
+    $policies = Get-AzRecoveryServicesBackupProtectionPolicy `
+        -WorkloadType AzureVM
+
+    $policy = $policies | Where-Object {
+        $_.Name -like "*Enhanced*"
+    } | Select-Object -First 1
+
+    $elapsed += 15
+    Write-Host "Waiting for policy availability... $elapsed sec"
+
+} while (-not $policy -and $elapsed -lt $timeout)
 
 if (-not $policy) {
-    throw "No Enhanced policy found in vault."
+    throw "Enhanced policy not found in vault."
 }
 
 Write-Host "Using Policy: $($policy.Name)"
 
 # ------------------------------------------------------------
-# Check If Already Protected
+# Wait for Container Registration
 # ------------------------------------------------------------
-Write-Host "Checking container registration..."
+Write-Host "Waiting for container registration..."
 
 $container = $null
 $timeout = 600
@@ -81,10 +93,12 @@ $elapsed = 0
 do {
     Start-Sleep -Seconds 20
 
-    $container = Get-AzRecoveryServicesBackupContainer `
-        -ContainerType AzureVM `
-        -Status Registered |
-        Where-Object { $_.FriendlyName -eq $VMName }
+    $containers = Get-AzRecoveryServicesBackupContainer `
+        -ContainerType AzureVM
+
+    $container = $containers | Where-Object {
+        $_.FriendlyName -eq $VMName
+    }
 
     $elapsed += 20
     Write-Host "Waiting... $elapsed sec"
@@ -92,10 +106,12 @@ do {
 } while (-not $container -and $elapsed -lt $timeout)
 
 if (-not $container) {
-    throw "VM container not registered in vault."
+    throw "VM container not found in vault."
 }
 
-# Now check protected item
+# ------------------------------------------------------------
+# Check If Already Protected
+# ------------------------------------------------------------
 $item = Get-AzRecoveryServicesBackupItem `
             -Container $container `
             -WorkloadType AzureVM `
@@ -110,6 +126,7 @@ if (-not $item) {
         -Container $container `
         -Confirm:$false
 
+    Write-Host "Waiting for protected item creation..."
     Start-Sleep -Seconds 40
 
     $item = Get-AzRecoveryServicesBackupItem `
