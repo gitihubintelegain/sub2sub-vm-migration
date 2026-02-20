@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  migration:
     runs-on: ubuntu-latest
 
     steps:
@@ -41,7 +41,7 @@ jobs:
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.SOURCE_SUB }}
+          subscription-id: ${{ env.DEST_SUB }}
           enable-AzPSSession: true
 
       - name: Install Latest Az Module
@@ -49,9 +49,12 @@ jobs:
         run: |
           Install-Module Az -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
           Import-Module Az -Force
-          Get-Module Az | Select Name, Version
 
-      - name: Run Script
+      # -----------------------------
+      # Run PowerShell for all except backupsetup
+      # -----------------------------
+      - name: Run PowerShell Phases
+        if: ${{ github.event.inputs.phase != 'backupsetup' }}
         shell: pwsh
         run: |
           ./scripts/main.ps1 `
@@ -61,3 +64,34 @@ jobs:
             -VMName "$env:VM" `
             -SourceVaultName "$env:VAULT" `
             -Phase "${{ github.event.inputs.phase }}"
+
+      # -----------------------------
+      # Terraform Backup Phase
+      # -----------------------------
+      - name: Get VM ID
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        id: get_vm
+        shell: pwsh
+        run: |
+          $vm = Get-AzVM -Name "$env:VM" -ResourceGroupName "$env:RG"
+          echo "vm_id=$($vm.Id)" >> $env:GITHUB_OUTPUT
+
+      - name: Setup Terraform
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Apply Backup
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="vm_name=$env:VM" \
+            -var="resource_group=$env:RG" \
+            -var="location=centralindia" \
+            -var="vm_id=${{ steps.get_vm.outputs.vm_id }}" \
+            -var="unique_suffix=$(date +%Y%m%d%H%M%S)"
