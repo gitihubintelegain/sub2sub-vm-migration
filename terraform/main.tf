@@ -2,8 +2,12 @@ provider "azurerm" {
   features {}
 }
 
+locals {
+  trimmed_vm_name = substr(var.vm_name, 0, 20)
+}
+
 resource "azurerm_recovery_services_vault" "vault" {
-  name                = "${var.vm_name}-vault-${var.unique_suffix}"
+  name                = "${local.trimmed_vm_name}-vault-${var.unique_suffix}"
   location            = var.location
   resource_group_name = var.resource_group
   sku                 = "Standard"
