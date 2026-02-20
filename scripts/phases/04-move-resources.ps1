@@ -33,6 +33,9 @@ Set-AzContext -SubscriptionId $SourceSubscription
 
 Write-Host "Initiating Move-AzResource..."
 
+Write-Host "Final Resource IDs being moved:"
+$ResourcesToMove | ForEach-Object { Write-Host $_ }
+
 Move-AzResource `
     -ResourceId $ResourcesToMove `
     -DestinationSubscriptionId $DestinationSubscription `
