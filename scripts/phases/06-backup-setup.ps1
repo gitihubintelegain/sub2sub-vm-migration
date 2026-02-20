@@ -15,21 +15,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup (Az 15.3.0 Stable)"
-Write-Host "========================================="
-
 Import-Module Az.RecoveryServices -Force
 Import-Module Az.Compute -Force
 
-# -------------------------------------------------------
-# Switch Subscription
-# -------------------------------------------------------
+Write-Host "========================================="
+Write-Host "Phase 6 - Backup Setup (Use Default Policy)"
+Write-Host "========================================="
+
+# Switch subscription
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
-# -------------------------------------------------------
-# Create Vault
-# -------------------------------------------------------
+# Create vault
 $uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
 $vaultName = "$VMName-vault-$uniqueSuffix"
 
@@ -40,40 +36,27 @@ $vault = New-AzRecoveryServicesVault `
     -ResourceGroupName $ResourceGroup `
     -Location $Location
 
-# CRITICAL
+# Set vault context (CRITICAL)
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
-# -------------------------------------------------------
-# Create Policy (Enhanced default model)
-# -------------------------------------------------------
+# Wait 10 seconds for vault backend provisioning
+Start-Sleep -Seconds 10
 
-Write-Host "Preparing schedule and retention policy..."
+# Get default policy created by Azure
+Write-Host "Retrieving default backup policy..."
 
-$schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject `
-    -WorkloadType AzureVM
+$policy = Get-AzRecoveryServicesBackupProtectionPolicy `
+    -WorkloadType AzureVM |
+    Where-Object { $_.Name -like "*Default*" } |
+    Select-Object -First 1
 
-$retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject `
-    -WorkloadType AzureVM
+if (-not $policy) {
+    throw "Default AzureVM backup policy not found in vault."
+}
 
-# SAFE modification (retention only)
-$retentionPolicy.DailySchedule.DurationCountInDays = 7
+Write-Host "Using policy: $($policy.Name)"
 
-$policyName = "$VMName-policy"
-
-Write-Host "Creating backup policy..."
-
-$policy = New-AzRecoveryServicesBackupProtectionPolicy `
-    -Name $policyName `
-    -WorkloadType AzureVM `
-    -SchedulePolicy $schedulePolicy `
-    -RetentionPolicy $retentionPolicy
-
-Write-Host "Policy created."
-
-# -------------------------------------------------------
-# Enable Backup (Handles container registration internally)
-# -------------------------------------------------------
-
+# Enable backup
 Write-Host "Enabling backup for VM..."
 
 Enable-AzRecoveryServicesBackupProtection `
@@ -83,34 +66,18 @@ Enable-AzRecoveryServicesBackupProtection `
 
 Write-Host "Backup enable initiated."
 
-# -------------------------------------------------------
 # Wait for container registration
-# -------------------------------------------------------
+Start-Sleep -Seconds 15
 
-Write-Host "Waiting for VM container registration..."
-
-$timeout = 120
-$elapsed = 0
-
-do {
-    Start-Sleep -Seconds 10
-    $container = Get-AzRecoveryServicesBackupContainer `
-        -ContainerType AzureVM `
-        -FriendlyName $VMName `
-        -ErrorAction SilentlyContinue
-    $elapsed += 10
-} while (-not $container -and $elapsed -lt $timeout)
+$container = Get-AzRecoveryServicesBackupContainer `
+    -ContainerType AzureVM `
+    -FriendlyName $VMName
 
 if (-not $container) {
-    throw "VM container registration did not complete in expected time."
+    throw "VM container registration failed."
 }
 
-Write-Host "Container registered."
-
-# -------------------------------------------------------
-# Trigger Initial Backup
-# -------------------------------------------------------
-
+# Trigger initial backup
 $item = Get-AzRecoveryServicesBackupItem `
     -Container $container `
     -WorkloadType AzureVM
