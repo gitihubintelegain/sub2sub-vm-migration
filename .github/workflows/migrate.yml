@@ -46,10 +46,9 @@ jobs:
       - name: Install Latest Az Module
         shell: pwsh
         run: |
-          Get-InstalledModule Az -ErrorAction SilentlyContinue | Uninstall-Module -Force -AllVersions
           Install-Module Az -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
-          Import-Module Az
-          (Get-Module Az).Version
+          Import-Module Az -Force
+          Get-Module Az | Select Name, Version
 
       - name: Run Script
         shell: pwsh
