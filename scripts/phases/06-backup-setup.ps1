@@ -1,7 +1,3 @@
-Import-Module Az.RecoveryServices -Force
-Import-Module Az.Compute -Force
-Import-Module Az.Network -Force
-
 param(
     [Parameter(Mandatory)]
     [string]$DestinationSubscription,
