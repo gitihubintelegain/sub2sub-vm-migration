@@ -1,6 +1,3 @@
-Import-Module Az.RecoveryServices -Force
-Import-Module Az.Compute -Force
-
 param(
     [Parameter(Mandatory)]
     [string]$DestinationSubscription,
@@ -17,6 +14,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+Import-Module Az.RecoveryServices -Force
+Import-Module Az.Compute -Force
 
 Write-Host "========================================="
 Write-Host "Phase 6 - Backup Setup (Az 15.3.0 Corrected)"
