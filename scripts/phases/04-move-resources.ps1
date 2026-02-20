@@ -9,37 +9,55 @@ param(
     [string]$ResourceGroup,
 
     [Parameter(Mandatory)]
-    [array]$ResourcesToMove
+    [string[]]$ResourcesToMove
 )
 
 Write-Host "========================================="
-Write-Host "Phase 4 - Moving Resources"
+Write-Host "Phase 4 - Move Resources"
 Write-Host "========================================="
 
-Set-AzContext -SubscriptionId $SourceSubscription
+Set-AzContext -SubscriptionId $SourceSubscription | Out-Null
 
-# Ensure destination RG exists
-Set-AzContext -SubscriptionId $DestinationSubscription
+try {
 
-$destRG = Get-AzResourceGroup -Name $ResourceGroup -ErrorAction SilentlyContinue
+    Write-Host "Initiating Move-AzResource..."
 
-if (-not $destRG) {
-    Write-Host "Creating destination resource group..."
-    New-AzResourceGroup -Name $ResourceGroup -Location "centralindia"
+    Move-AzResource `
+        -DestinationSubscriptionId $DestinationSubscription `
+        -DestinationResourceGroupName $ResourceGroup `
+        -ResourceId $ResourcesToMove `
+        -Force
+
+    Write-Host "Move completed successfully."
+
+}
+catch {
+
+    Write-Host "Move reported failure. Validating actual resource state..."
+
+    # Switch to destination subscription
+    Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
+
+    # Extract VM ID from move list
+    $vmId = $ResourcesToMove | Where-Object { $_ -like "*Microsoft.Compute/virtualMachines/*" }
+
+    if (-not $vmId) {
+        throw "Could not determine VM ID for validation."
+    }
+
+    $vmName = ($vmId -split "/")[-1]
+
+    $vm = Get-AzVM -Name $vmName -ResourceGroupName $ResourceGroup -ErrorAction SilentlyContinue
+
+    if ($vm) {
+        Write-Host "VM found in destination subscription."
+        Write-Host "Treating move as successful despite batch failure."
+    }
+    else {
+        throw "Move failed and VM not found in destination. Aborting."
+    }
 }
 
-# Switch back to source for move operation
-Set-AzContext -SubscriptionId $SourceSubscription
-
-Write-Host "Initiating Move-AzResource..."
-
-Write-Host "Final Resource IDs being moved:"
-$ResourcesToMove | ForEach-Object { Write-Host $_ }
-
-Move-AzResource `
-    -ResourceId $ResourcesToMove `
-    -DestinationSubscriptionId $DestinationSubscription `
-    -DestinationResourceGroupName $ResourceGroup `
-    -Force
-
-Write-Host "Move operation initiated."
+Write-Host "========================================="
+Write-Host "Move Phase Completed"
+Write-Host "========================================="
