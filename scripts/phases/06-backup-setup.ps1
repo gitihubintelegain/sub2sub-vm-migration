@@ -29,7 +29,7 @@ Import-Module Az.Compute -Force
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
 # -------------------------------------------------------
-# 2. Create Vault
+# 2. Create Unique Recovery Services Vault
 # -------------------------------------------------------
 
 $uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
@@ -52,34 +52,35 @@ $policyName = "$VMName-policy"
 
 Write-Host "Creating STANDARD AzureVM backup policy..."
 
-# Create Standard schedule policy object
-$schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
+# Explicitly request Standard subtype objects
+$schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject `
+    -WorkloadType AzureVM `
+    -PolicySubType Standard
 
 $schedulePolicy.ScheduleRunFrequency = "Daily"
-$schedulePolicy.ScheduleRunTimes.Clear()
-$schedulePolicy.ScheduleRunTimes.Add((Get-Date "11:00"))
+$schedulePolicy.ScheduleRunTimes = @((Get-Date "11:00"))
 
-# Create Standard retention policy object
-$retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
+$retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject `
+    -WorkloadType AzureVM `
+    -PolicySubType Standard
 
 $retentionPolicy.DailySchedule.DurationCountInDays = 7
-$retentionPolicy.DailySchedule.RetentionTimes.Clear()
-$retentionPolicy.DailySchedule.RetentionTimes.Add((Get-Date "11:00"))
+$retentionPolicy.DailySchedule.RetentionTimes = @((Get-Date "11:00"))
 
-# Create Policy
 $policy = New-AzRecoveryServicesBackupProtectionPolicy `
     -Name $policyName `
     -WorkloadType AzureVM `
+    -PolicySubType Standard `
     -SchedulePolicy $schedulePolicy `
     -RetentionPolicy $retentionPolicy
 
-Write-Host "Standard policy created successfully."
+Write-Host "Standard backup policy created successfully."
 
 # -------------------------------------------------------
-# 4. Enable Backup
+# 4. Enable Backup for VM
 # -------------------------------------------------------
 
-Write-Host "Enabling backup..."
+Write-Host "Enabling backup for VM..."
 
 Enable-AzRecoveryServicesBackupProtection `
     -Policy $policy `
@@ -92,7 +93,7 @@ Write-Host "Backup enabled."
 # 5. Trigger Initial Backup
 # -------------------------------------------------------
 
-Write-Host "Retrieving container..."
+Write-Host "Retrieving backup container..."
 
 $container = Get-AzRecoveryServicesBackupContainer `
     -ContainerType AzureVM `
