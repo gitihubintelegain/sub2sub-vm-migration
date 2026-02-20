@@ -20,9 +20,13 @@ $vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup -ErrorAction Stop
 # -------------------------------------------------------
 # Deallocate VM
 # -------------------------------------------------------
-$status = (Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup -Status)
+$status = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup -Status
 
-if ($status.PowerState -ne "VM deallocated") {
+$powerState = ($status.Statuses | Where-Object {
+    $_.Code -like "PowerState/*"
+}).DisplayStatus
+
+if ($powerState -ne "VM deallocated") {
     Write-Host "Deallocating VM..."
     Stop-AzVM -Name $VMName -ResourceGroupName $ResourceGroup -Force | Out-Null
     Write-Host "VM deallocated."
