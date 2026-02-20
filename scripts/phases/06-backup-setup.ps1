@@ -61,7 +61,7 @@ $vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
 Write-Host "Registering VM container..."
 
 Register-AzRecoveryServicesBackupContainer `
-    -BackupManagementType AzureVM `
+    -BackupManagementType AzureWorkload `
     -WorkloadType AzureVM `
     -ResourceId $vm.Id | Out-Null
 
