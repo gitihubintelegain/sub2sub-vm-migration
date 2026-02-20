@@ -12,21 +12,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+Import-Module Az.Accounts -Force
+Import-Module Az.Compute -Force
+Import-Module Az.RecoveryServices -Force
+
 Write-Host "========================================="
 Write-Host "Phase 6 - Backup Setup"
 Write-Host "========================================="
 
 # ------------------------------------------------------------
-# Ensure latest Az modules (important for GitHub runners)
-# ------------------------------------------------------------
-Write-Host "Installing latest Az module..."
-Install-Module Az -Scope CurrentUser -Force -AllowClobber
-Import-Module Az -Force
-
-# ------------------------------------------------------------
 # Switch Subscription
 # ------------------------------------------------------------
-Write-Host "Switching subscription..."
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
 # ------------------------------------------------------------
@@ -59,42 +55,24 @@ Set-AzRecoveryServicesVaultContext -Vault $vault
 Start-Sleep -Seconds 30
 
 # ------------------------------------------------------------
-# Create Custom Enhanced Policy (Daily 1AM UTC, 30 days)
+# Get Existing Enhanced Policy (DO NOT CREATE NEW)
 # ------------------------------------------------------------
-$policyName = "Enhanced-Daily-Policy"
+Write-Host "Getting existing Enhanced policy..."
 
-$policy = Get-AzRecoveryServicesBackupProtectionPolicy `
-            -WorkloadType AzureVM |
-          Where-Object { $_.Name -eq $policyName }
+$policy = Get-AzRecoveryServicesBackupProtectionPolicy -WorkloadType AzureVM |
+          Where-Object { $_.Name -like "*Enhanced*" } |
+          Select-Object -First 1
 
 if (-not $policy) {
-
-    Write-Host "Creating custom Enhanced policy..."
-
-    # Create Enhanced Policy
-    $policy = New-AzRecoveryServicesBackupProtectionPolicy `
-        -Name $policyName `
-        -WorkloadType AzureVM `
-        -PolicySubType Enhanced
-
-    # Configure Daily Schedule
-    $policy.SchedulePolicy.ScheduleRunFrequency = "Daily"
-    $policy.SchedulePolicy.ScheduleRunTimes.Clear()
-    $policy.SchedulePolicy.ScheduleRunTimes.Add((Get-Date "01:00"))
-
-    # Retention 30 days
-    $policy.RetentionPolicy.DailySchedule.DurationCountInDays = 30
-
-    Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
+    throw "No Enhanced policy found in vault."
 }
 
 Write-Host "Using Policy: $($policy.Name)"
 
 # ------------------------------------------------------------
-# Check if already protected
+# Check If Already Protected
 # ------------------------------------------------------------
-$item = Get-AzRecoveryServicesBackupItem `
-            -WorkloadType AzureVM |
+$item = Get-AzRecoveryServicesBackupItem -WorkloadType AzureVM |
         Where-Object { $_.FriendlyName -eq $VMName }
 
 if (-not $item) {
