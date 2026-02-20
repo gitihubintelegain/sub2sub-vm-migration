@@ -83,6 +83,21 @@ if ($Phase -eq "move" -or $Phase -eq "all") {
         -ResourcesToMove $resourcesToMove
 }
 
+# -------------------------
+# Phase 5 - Post Move
+# -------------------------
+
+if ($Phase -eq "all" -or $Phase -eq "post") {
+
+    Write-Host "Phase 5 - Post Move"
+
+    . "$PSScriptRoot/phases/05-post-move.ps1" `
+        -DestinationSubscription $DestinationSubscription `
+        -ResourceGroup $ResourceGroup `
+        -VMName $VMName `
+        -Location "centralindia"
+}
+
 Write-Host "========================================="
 Write-Host "Execution Completed"
 Write-Host "========================================="
