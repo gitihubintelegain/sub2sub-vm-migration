@@ -58,4 +58,5 @@ jobs:
             -DestinationSubscription "$env:DEST_SUB" `
             -ResourceGroup "$env:RG" `
             -VMName "$env:VM" `
-            -SourceVaultName "$env:VAULT"
+            -SourceVaultName "$env:VAULT" `
+            -Phase "${{ github.event.inputs.phase }}"
