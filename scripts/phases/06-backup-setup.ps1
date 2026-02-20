@@ -38,6 +38,10 @@ Set-AzRecoveryServicesVaultContext -Vault $vault
 # 2. Create Backup Policy (Daily 11 AM, 7 days retention)
 # -------------------------------------------------------
 
+# -------------------------------------------------------
+# 2. Create Backup Policy (Enhanced Model - Az 15+ Safe)
+# -------------------------------------------------------
+
 $policyName = "$VMName-policy"
 
 $existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy `
@@ -46,25 +50,24 @@ $existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy `
 
 if (-not $existingPolicy) {
 
-    Write-Host "Creating backup policy (Az 15+ compatible)..."
+    Write-Host "Creating Enhanced backup policy..."
 
-    # Get default objects
-    $schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
-    $retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
-
-    # Schedule
-    $schedulePolicy.ScheduleRunFrequency = "Daily"
-    $schedulePolicy.ScheduleRunTime = (Get-Date "11:00")
-
-    # Retention
-    $retentionPolicy.DailySchedule.DurationCountInDays = 7
-    $retentionPolicy.DailySchedule.RetentionTime = (Get-Date "11:00")
-
+    # Create default Enhanced policy
     $policy = New-AzRecoveryServicesBackupProtectionPolicy `
         -Name $policyName `
-        -WorkloadType AzureVM `
-        -SchedulePolicy $schedulePolicy `
-        -RetentionPolicy $retentionPolicy
+        -WorkloadType AzureVM
+
+    # Modify schedule (Daily 11 AM)
+    $policy.SchedulePolicy.ScheduleRunFrequency = "Daily"
+    $policy.SchedulePolicy.ScheduleRunTimes = @((Get-Date "11:00"))
+
+    # Modify retention (7 days)
+    $policy.RetentionPolicy.DailySchedule.DurationCountInDays = 7
+    $policy.RetentionPolicy.DailySchedule.RetentionTimes = @((Get-Date "11:00"))
+
+    # Commit changes
+    Set-AzRecoveryServicesBackupProtectionPolicy -Policy $policy
+
 }
 else {
     Write-Host "Policy already exists."
