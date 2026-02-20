@@ -2,6 +2,18 @@ name: Sub2Sub VM Migration
 
 on:
   workflow_dispatch:
+    inputs:
+      phase:
+        description: "Phase to execute"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - validate
+          - backup
+          - prepare
+          - move
 
 permissions:
   id-token: write
