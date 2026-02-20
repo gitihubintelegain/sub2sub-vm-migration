@@ -30,6 +30,14 @@ jobs:
           subscription-id: ${{ env.SOURCE_SUB }}
           enable-AzPSSession: true
 
+      - name: Install Latest Az Module
+        shell: pwsh
+        run: |
+          Get-InstalledModule Az -ErrorAction SilentlyContinue | Uninstall-Module -Force -AllVersions
+          Install-Module Az -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
+          Import-Module Az
+          (Get-Module Az).Version
+
       - name: Run Script
         shell: pwsh
         run: |
@@ -38,4 +46,4 @@ jobs:
             -DestinationSubscription "$env:DEST_SUB" `
             -ResourceGroup "$env:RG" `
             -VMName "$env:VM" `
-            -SourceVaultName $env:VAULT
+            -SourceVaultName "$env:VAULT"
