@@ -34,23 +34,35 @@ if ($vm.ProvisioningState -ne "Succeeded") {
 }
 
 Write-Host "VM found: $($vm.Name)"
-Write-Host "VM Location: $($vm.Location)"
+Write-Host "Location: $($vm.Location)"
 
 # -------------------------------------------------------
 # 2. Validate NIC & Public IP
 # -------------------------------------------------------
 
-$nicId = $vm.NetworkProfile.NetworkInterfaces[0].Id
-$nicName = ($nicId -split "/")[-1]
-$nic = Get-AzNetworkInterface -Name $nicName -ResourceGroupName $ResourceGroup -ErrorAction Stop
+if (-not $vm.NetworkProfile.NetworkInterfaces) {
+    throw "No NIC attached to VM."
+}
 
+$nicId = $vm.NetworkProfile.NetworkInterfaces[0].Id
+$nicName = ($nicId.Split('/'))[-1]
+
+$nic = Get-AzNetworkInterface -Name $nicName -ResourceGroupName $ResourceGroup -ErrorAction Stop
 Write-Host "Primary NIC: $($nic.Name)"
 
 if ($nic.IpConfigurations[0].PublicIpAddress) {
-    $publicIp = Get-AzPublicIpAddress -ResourceId $nic.IpConfigurations[0].PublicIpAddress.Id
+
+    $pipId  = $nic.IpConfigurations[0].PublicIpAddress.Id
+    $pipParts = $pipId.Split('/')
+    $pipName = $pipParts[-1]
+    $pipRg   = $pipParts[4]
+
+    $publicIp = Get-AzPublicIpAddress -Name $pipName -ResourceGroupName $pipRg -ErrorAction Stop
+
     Write-Host "Public IP detected: $($publicIp.Name)"
     Write-Host "Public IP SKU: $($publicIp.Sku.Name)"
-} else {
+}
+else {
     Write-Host "No Public IP attached."
 }
 
@@ -64,7 +76,8 @@ if ($vm.StorageProfile.DataDisks.Count -gt 0) {
     foreach ($disk in $vm.StorageProfile.DataDisks) {
         Write-Host "Data Disk: $($disk.Name)"
     }
-} else {
+}
+else {
     Write-Host "No Data Disks attached."
 }
 
@@ -73,20 +86,25 @@ if ($vm.StorageProfile.DataDisks.Count -gt 0) {
 # -------------------------------------------------------
 
 Write-Host "Checking for resource locks..."
-$locks = Get-AzResourceLock -ResourceGroupName $ResourceGroup
 
-if ($locks) {
+$locks = Get-AzResourceLock -ResourceGroupName $ResourceGroup -ErrorAction SilentlyContinue
+
+if ($locks -and $locks.Count -gt 0) {
     foreach ($lock in $locks) {
         Write-Host "Lock detected: $($lock.Name) - $($lock.LockLevel)"
     }
     throw "Resource locks detected. Remove locks before migration."
 }
+else {
+    Write-Host "No resource locks found."
+}
 
 # -------------------------------------------------------
-# 5. Validate Source Vault Exists
+# 5. Validate Source Recovery Services Vault
 # -------------------------------------------------------
 
 Write-Host "Validating Recovery Services Vault exists..."
+
 $vault = Get-AzRecoveryServicesVault -Name $SourceVaultName -ErrorAction Stop
 Write-Host "Vault found: $($vault.Name)"
 
@@ -99,12 +117,12 @@ Set-AzContext -SubscriptionId $DestinationSubscription -ErrorAction Stop
 
 Write-Host "Destination subscription validated."
 
-# Check if destination RG exists (create later if needed)
 $destRG = Get-AzResourceGroup -Name $ResourceGroup -ErrorAction SilentlyContinue
 
 if (-not $destRG) {
     Write-Host "Destination Resource Group does not exist. It will be created during migration."
-} else {
+}
+else {
     Write-Host "Destination Resource Group exists."
 }
 
