@@ -19,6 +19,9 @@ param(
     [string]$Phase
 )
 
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
 Write-Host "========================================="
 Write-Host "Sub2Sub VM Migration - Phase: $Phase"
 Write-Host "========================================="
@@ -61,10 +64,19 @@ if ($Phase -in @("prepare","all")) {
 
     Write-Host "Phase 3 - Prepare For Move"
 
-    $resourcesToMove = . "$PSScriptRoot/phases/03-prepare-for-move.ps1" `
+    $rawOutput = & "$PSScriptRoot/phases/03-prepare-for-move.ps1" `
         -SourceSubscription $SourceSubscription `
         -ResourceGroup $ResourceGroup `
         -VMName $VMName
+
+    # Filter only valid ARM IDs
+    $resourcesToMove = $rawOutput | Where-Object {
+        $_ -is [string] -and $_ -like "/subscriptions/*"
+    }
+
+    if (-not $resourcesToMove) {
+        throw "Prepare phase did not return valid resource IDs."
+    }
 }
 
 # -------------------------
