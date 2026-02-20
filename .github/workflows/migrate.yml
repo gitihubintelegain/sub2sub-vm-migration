@@ -76,6 +76,14 @@ jobs:
           $vm = Get-AzVM -Name "$env:VM" -ResourceGroupName "$env:RG"
           echo "vm_id=$($vm.Id)" >> $env:GITHUB_OUTPUT
 
+      - name: Generate Unique Suffix
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        id: suffix
+        shell: pwsh
+        run: |
+          $suffix = Get-Date -Format "yyyyMMddHHmmss"
+          echo "suffix=$suffix" >> $env:GITHUB_OUTPUT
+
       - name: Setup Terraform
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
         uses: hashicorp/setup-terraform@v3
@@ -94,4 +102,4 @@ jobs:
             -var="resource_group=$env:RG" \
             -var="location=centralindia" \
             -var="vm_id=${{ steps.get_vm.outputs.vm_id }}" \
-            -var="unique_suffix=$(date +%Y%m%d%H%M%S)"
+            -var="unique_suffix=${{ steps.suffix.outputs.suffix }}"
