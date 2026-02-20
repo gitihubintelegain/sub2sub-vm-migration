@@ -16,12 +16,14 @@ resource "azurerm_backup_policy_vm" "policy" {
 
   backup {
     frequency = "Daily"
-    time      = "06:00"
+    time      = "06:00"   # 11:30 AM IST = 06:00 UTC
   }
 
   retention_daily {
     count = 7
   }
+
+  instant_restore_retention_days = 5
 }
 
 resource "azurerm_backup_protected_vm" "vm_backup" {
