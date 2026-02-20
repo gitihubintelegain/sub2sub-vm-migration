@@ -42,25 +42,45 @@ Set-AzRecoveryServicesVaultContext -Vault $vault
 # 2. Create Backup Policy (Daily 11 AM, 7 days retention)
 # -------------------------------------------------------
 
+# -------------------------------------------------------
+# 2. Create Backup Policy (Daily 11 AM, 7 days retention)
+# -------------------------------------------------------
+
 $policyName = "$VMName-policy"
 
-Write-Host "Creating backup policy..."
-
-$schedulePolicy = New-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
-$schedulePolicy.ScheduleRunFrequency = "Daily"
-$schedulePolicy.ScheduleRunTimes = @((Get-Date "11:00"))
-
-$retentionPolicy = New-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
-$retentionPolicy.DailySchedule.DurationCountInDays = 7
-$retentionPolicy.DailySchedule.RetentionTimes = @((Get-Date "11:00"))
-
-$policy = New-AzRecoveryServicesBackupProtectionPolicy `
+$existingPolicy = Get-AzRecoveryServicesBackupProtectionPolicy `
     -Name $policyName `
-    -WorkloadType AzureVM `
-    -SchedulePolicy $schedulePolicy `
-    -RetentionPolicy $retentionPolicy
+    -ErrorAction SilentlyContinue
 
-Write-Host "Backup policy created."
+if (-not $existingPolicy) {
+
+    Write-Host "Creating backup policy..."
+
+    # Get default templates
+    $schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
+    $retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
+
+    # Configure schedule
+    $schedulePolicy.ScheduleRunFrequency = "Daily"
+    $schedulePolicy.ScheduleRunTimes.Clear()
+    $schedulePolicy.ScheduleRunTimes.Add((Get-Date "11:00"))
+
+    # Configure retention
+    $retentionPolicy.DailySchedule.DurationCountInDays = 7
+    $retentionPolicy.DailySchedule.RetentionTimes.Clear()
+    $retentionPolicy.DailySchedule.RetentionTimes.Add((Get-Date "11:00"))
+
+    $policy = New-AzRecoveryServicesBackupProtectionPolicy `
+        -Name $policyName `
+        -WorkloadType AzureVM `
+        -SchedulePolicy $schedulePolicy `
+        -RetentionPolicy $retentionPolicy
+
+}
+else {
+    Write-Host "Policy already exists."
+    $policy = $existingPolicy
+}
 
 # -------------------------------------------------------
 # 3. Enable Backup
