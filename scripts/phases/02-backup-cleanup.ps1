@@ -69,24 +69,21 @@ do {
 
     $container = Get-AzRecoveryServicesBackupContainer `
         -ContainerType AzureVM `
-        -Status Registered `
-        | Where-Object { $_.FriendlyName -eq $VMName }
+        -FriendlyName $VMName `
+        -ErrorAction SilentlyContinue
 
     if ($container) {
         $updatedItem = Get-AzRecoveryServicesBackupItem `
             -Container $container `
             -WorkloadType AzureVM `
             -ErrorAction SilentlyContinue
-    } else {
+    }
+    else {
         $updatedItem = $null
     }
 
     $retry++
 
-} while ($updatedItem -and $updatedItem.ProtectionState -eq 1 -and $retry -lt $maxRetries)
-
-if ($updatedItem -and $updatedItem.ProtectionState -eq 1) {
-    throw "Backup disable did not complete in expected time."
-}
+} while ($updatedItem -and $updatedItem.ProtectionState -eq "Protected" -and $retry -lt $maxRetries)
 
 Write-Host "Backup successfully disabled."
