@@ -19,13 +19,19 @@ Import-Module Az.RecoveryServices -Force
 Import-Module Az.Compute -Force
 
 Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup (Use Default Policy)"
+Write-Host "Phase 6 - Backup Setup (Az 15.3.0 Final)"
 Write-Host "========================================="
 
-# Switch subscription
+# -------------------------------------------------------
+# Switch Subscription
+# -------------------------------------------------------
+
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
-# Create vault
+# -------------------------------------------------------
+# Create Recovery Services Vault
+# -------------------------------------------------------
+
 $uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
 $vaultName = "$VMName-vault-$uniqueSuffix"
 
@@ -36,14 +42,17 @@ $vault = New-AzRecoveryServicesVault `
     -ResourceGroupName $ResourceGroup `
     -Location $Location
 
-# Set vault context (CRITICAL)
+# IMPORTANT
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
-# Wait 10 seconds for vault backend provisioning
-Start-Sleep -Seconds 10
+# Give backend time to initialize vault fabric
+Start-Sleep -Seconds 20
 
-# Get default policy created by Azure
-Write-Host "Retrieving default backup policy..."
+# -------------------------------------------------------
+# Get Default AzureVM Policy
+# -------------------------------------------------------
+
+Write-Host "Retrieving default AzureVM policy..."
 
 $policy = Get-AzRecoveryServicesBackupProtectionPolicy `
     -WorkloadType AzureVM |
@@ -51,12 +60,48 @@ $policy = Get-AzRecoveryServicesBackupProtectionPolicy `
     Select-Object -First 1
 
 if (-not $policy) {
-    throw "Default AzureVM backup policy not found in vault."
+    throw "Default AzureVM policy not found."
 }
 
 Write-Host "Using policy: $($policy.Name)"
 
-# Enable backup
+# -------------------------------------------------------
+# Register VM Container (CRITICAL STEP)
+# -------------------------------------------------------
+
+Write-Host "Registering VM container in vault..."
+
+$vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
+
+Register-AzRecoveryServicesBackupContainer `
+    -ResourceId $vm.Id `
+    -WorkloadType AzureVM | Out-Null
+
+Write-Host "Waiting for container discovery..."
+
+$timeout = 240
+$elapsed = 0
+$container = $null
+
+do {
+    Start-Sleep -Seconds 15
+    $container = Get-AzRecoveryServicesBackupContainer `
+        -ContainerType AzureVM `
+        -FriendlyName $VMName `
+        -ErrorAction SilentlyContinue
+    $elapsed += 15
+} while (-not $container -and $elapsed -lt $timeout)
+
+if (-not $container) {
+    throw "VM container registration failed or timed out."
+}
+
+Write-Host "Container registered successfully."
+
+# -------------------------------------------------------
+# Enable Backup Protection
+# -------------------------------------------------------
+
 Write-Host "Enabling backup for VM..."
 
 Enable-AzRecoveryServicesBackupProtection `
@@ -66,21 +111,25 @@ Enable-AzRecoveryServicesBackupProtection `
 
 Write-Host "Backup enable initiated."
 
-# Wait for container registration
-Start-Sleep -Seconds 15
+# -------------------------------------------------------
+# Wait for Protected Item Creation
+# -------------------------------------------------------
 
-$container = Get-AzRecoveryServicesBackupContainer `
-    -ContainerType AzureVM `
-    -FriendlyName $VMName
+Start-Sleep -Seconds 20
 
-if (-not $container) {
-    throw "VM container registration failed."
-}
-
-# Trigger initial backup
 $item = Get-AzRecoveryServicesBackupItem `
     -Container $container `
     -WorkloadType AzureVM
+
+if (-not $item) {
+    throw "Protected item not found after enabling backup."
+}
+
+Write-Host "Protection established."
+
+# -------------------------------------------------------
+# Trigger Initial Backup
+# -------------------------------------------------------
 
 Write-Host "Triggering initial backup..."
 
