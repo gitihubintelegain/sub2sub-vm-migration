@@ -15,7 +15,7 @@ param(
     [string]$SourceVaultName,
 
     [Parameter(Mandatory)]
-    [ValidateSet("all","validate","backup","prepare","move","post")]
+    [ValidateSet("all","validate","backup","prepare","move","post","backupsetup")]
     [string]$Phase
 )
 
@@ -105,6 +105,20 @@ if ($Phase -in @("post","all")) {
     Write-Host "Phase 5 - Post Move"
 
     . "$PSScriptRoot/phases/05-post-move.ps1" `
+        -DestinationSubscription $DestinationSubscription `
+        -ResourceGroup $ResourceGroup `
+        -VMName $VMName `
+        -Location "centralindia"
+}
+# -------------------------
+# Phase 6 - Post Move Backup Setup
+# -------------------------
+
+if ($Phase -in @("backupsetup","all")) {
+
+    Write-Host "Phase 6 - Backup Setup"
+
+    . "$PSScriptRoot/phases/06-backup-setup.ps1" `
         -DestinationSubscription $DestinationSubscription `
         -ResourceGroup $ResourceGroup `
         -VMName $VMName `
