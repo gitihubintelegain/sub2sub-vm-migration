@@ -46,10 +46,20 @@ $nic = Get-AzNetworkInterface -Name $nicName -ResourceGroupName $ResourceGroup
 # -------------------------------------------------------
 # Detach Public IP
 # -------------------------------------------------------
+
+# Detach Public IP (but capture its ID first)
+$publicIpId = $null
+
 if ($nic.IpConfigurations[0].PublicIpAddress) {
+
+    $publicIpId = $nic.IpConfigurations[0].PublicIpAddress.Id
+
+    Write-Host "Public IP detected: $publicIpId"
     Write-Host "Detaching Public IP..."
+
     $nic.IpConfigurations[0].PublicIpAddress = $null
     Set-AzNetworkInterface -NetworkInterface $nic | Out-Null
+
     Write-Host "Public IP detached."
 }
 
@@ -64,6 +74,11 @@ $resourcesToMove += $vm.Id
 
 # NIC
 $resourcesToMove += $nic.Id
+
+# Public IP
+if ($publicIpId) {
+    $resourcesToMove += $publicIpId
+}
 
 # OS Disk
 $resourcesToMove += $vm.StorageProfile.OsDisk.ManagedDisk.Id
