@@ -12,17 +12,21 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-Import-Module Az.Accounts -Force
-Import-Module Az.Compute -Force
-Import-Module Az.RecoveryServices -Force
+Write-Host "========================================="
+Write-Host "Phase 6 - Backup Setup"
+Write-Host "========================================="
 
-Write-Host "=============================="
-Write-Host "Backup Setup - Clean Version"
-Write-Host "=============================="
+# ------------------------------------------------------------
+# Ensure latest Az modules (important for GitHub runners)
+# ------------------------------------------------------------
+Write-Host "Installing latest Az module..."
+Install-Module Az -Scope CurrentUser -Force -AllowClobber
+Import-Module Az -Force
 
 # ------------------------------------------------------------
 # Switch Subscription
 # ------------------------------------------------------------
+Write-Host "Switching subscription..."
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
 # ------------------------------------------------------------
@@ -52,7 +56,6 @@ if (-not $vault) {
 }
 
 Set-AzRecoveryServicesVaultContext -Vault $vault
-
 Start-Sleep -Seconds 30
 
 # ------------------------------------------------------------
@@ -68,12 +71,13 @@ if (-not $policy) {
 
     Write-Host "Creating custom Enhanced policy..."
 
+    # Create Enhanced Policy
     $policy = New-AzRecoveryServicesBackupProtectionPolicy `
         -Name $policyName `
         -WorkloadType AzureVM `
         -PolicySubType Enhanced
 
-    # Configure daily schedule
+    # Configure Daily Schedule
     $policy.SchedulePolicy.ScheduleRunFrequency = "Daily"
     $policy.SchedulePolicy.ScheduleRunTimes.Clear()
     $policy.SchedulePolicy.ScheduleRunTimes.Add((Get-Date "01:00"))
@@ -87,7 +91,7 @@ if (-not $policy) {
 Write-Host "Using Policy: $($policy.Name)"
 
 # ------------------------------------------------------------
-# Check If Already Protected
+# Check if already protected
 # ------------------------------------------------------------
 $item = Get-AzRecoveryServicesBackupItem `
             -WorkloadType AzureVM |
@@ -125,7 +129,6 @@ if (-not $item) {
         -Container $container `
         -Confirm:$false
 
-    # Wait for protected item
     Start-Sleep -Seconds 40
 
     $item = Get-AzRecoveryServicesBackupItem `
@@ -145,6 +148,6 @@ Backup-AzRecoveryServicesBackupItem `
     -Item $item `
     -Confirm:$false
 
-Write-Host "=================================="
+Write-Host "========================================="
 Write-Host "Backup Setup Completed Successfully"
-Write-Host "=================================="
+Write-Host "========================================="
