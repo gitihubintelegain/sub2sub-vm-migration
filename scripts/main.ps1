@@ -121,7 +121,7 @@ if ($Phase -in @("backupsetup","all")) {
     . "$PSScriptRoot/phases/06-backup-setup.ps1" `
         -DestinationSubscription $DestinationSubscription `
         -ResourceGroup $ResourceGroup `
-        -VMName $VMName"
+        -VMName $VMName
 }
 
 Write-Host "========================================="
