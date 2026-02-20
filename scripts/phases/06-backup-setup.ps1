@@ -15,44 +15,71 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+Import-Module Az.Accounts -Force
 Import-Module Az.RecoveryServices -Force
 Import-Module Az.Compute -Force
 
 Write-Host "========================================="
-Write-Host "Phase 6 - Backup Setup (Final Clean)"
+Write-Host "Phase 6 - Backup Setup (Enterprise Version)"
 Write-Host "========================================="
 
-# Switch subscription
+# ----------------------------------------------------------
+# Switch to destination subscription
+# ----------------------------------------------------------
+Write-Host "Switching subscription..."
 Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
-# Create vault
-$uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
-$vaultName = "$VMName-vault-$uniqueSuffix"
-
-$vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
+# ----------------------------------------------------------
+# Validate VM exists
+# ----------------------------------------------------------
+Write-Host "Validating VM..."
+$vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup -ErrorAction Stop
 $vaultLocation = $vm.Location
 
-Write-Host "VM Location: $vaultLocation"
-Write-Host "Creating vault in same region..."
+Write-Host "VM found in location: $vaultLocation"
 
-$vault = New-AzRecoveryServicesVault `
-    -Name $vaultName `
-    -ResourceGroupName $ResourceGroup `
-    -Location $vaultLocation
+# ----------------------------------------------------------
+# Create or Get Recovery Services Vault
+# ----------------------------------------------------------
+$vaultName = "$VMName-backup-vault"
 
+Write-Host "Checking for existing vault..."
+
+$vault = Get-AzRecoveryServicesVault `
+            -ResourceGroupName $ResourceGroup `
+            -ErrorAction SilentlyContinue |
+         Where-Object { $_.Location -eq $vaultLocation } |
+         Select-Object -First 1
+
+if (-not $vault) {
+    Write-Host "No vault found. Creating new vault..."
+    $vault = New-AzRecoveryServicesVault `
+        -Name $vaultName `
+        -ResourceGroupName $ResourceGroup `
+        -Location $vaultLocation
+
+    Write-Host "Vault created: $($vault.Name)"
+} else {
+    Write-Host "Using existing vault: $($vault.Name)"
+}
+
+# ----------------------------------------------------------
 # Set vault context
+# ----------------------------------------------------------
 Set-AzRecoveryServicesVaultContext -Vault $vault
 
-# Wait for vault backend provisioning
-Start-Sleep -Seconds 30
+Write-Host "Waiting for vault backend provisioning..."
+Start-Sleep -Seconds 45
 
-# Get default AzureVM policy
+# ----------------------------------------------------------
+# Get default Azure VM policy
+# ----------------------------------------------------------
 Write-Host "Retrieving default AzureVM policy..."
 
 $policy = Get-AzRecoveryServicesBackupProtectionPolicy `
-    -WorkloadType AzureVM |
-    Where-Object { $_.Name -like "*Default*" } |
-    Select-Object -First 1
+            -WorkloadType AzureVM |
+          Where-Object { $_.Name -like "*Default*" } |
+          Select-Object -First 1
 
 if (-not $policy) {
     throw "Default AzureVM policy not found."
@@ -60,40 +87,90 @@ if (-not $policy) {
 
 Write-Host "Using policy: $($policy.Name)"
 
-# Enable protection (THIS handles container registration internally)
-Write-Host "Enabling backup for VM..."
+# ----------------------------------------------------------
+# Check if VM already protected (Idempotent logic)
+# ----------------------------------------------------------
+Write-Host "Checking if VM is already protected..."
 
-Enable-AzRecoveryServicesBackupProtection `
-    -Policy $policy `
-    -Name $VMName `
-    -ResourceGroupName $ResourceGroup `
-    -Confirm:$false
+$existingItem = Get-AzRecoveryServicesBackupItem `
+                    -WorkloadType AzureVM |
+                Where-Object { $_.FriendlyName -eq $VMName }
 
-Write-Host "Backup enable initiated."
+if ($existingItem) {
+    Write-Host "VM is already protected. Skipping enable step."
+    $item = $existingItem
+}
+else {
 
-# Wait for protected item to appear
-$timeout = 240
-$elapsed = 0
-$item = $null
+    # ------------------------------------------------------
+    # Wait for VM container registration
+    # ------------------------------------------------------
+    Write-Host "Discovering VM container in vault..."
 
-do {
-    Start-Sleep -Seconds 15
-    $item = Get-AzRecoveryServicesBackupItem `
-        -WorkloadType AzureVM |
-        Where-Object { $_.Name -eq $VMName }
-    $elapsed += 15
-} while (-not $item -and $elapsed -lt $timeout)
+    $container = $null
+    $timeout = 600
+    $elapsed = 0
 
-if (-not $item) {
-    throw "Protected item did not appear within expected time."
+    do {
+        Start-Sleep -Seconds 20
+
+        $container = Get-AzRecoveryServicesBackupContainer `
+            -ContainerType AzureVM `
+            -Status Registered |
+            Where-Object { $_.FriendlyName -eq $VMName }
+
+        $elapsed += 20
+        Write-Host "Waiting for container registration... ($elapsed sec)"
+
+    } while (-not $container -and $elapsed -lt $timeout)
+
+    if (-not $container) {
+        throw "VM container not registered in vault within expected time."
+    }
+
+    Write-Host "Container discovered. Enabling protection..."
+
+    Enable-AzRecoveryServicesBackupProtection `
+        -Policy $policy `
+        -Container $container `
+        -Confirm:$false
+
+    Write-Host "Backup enable initiated."
+
+    # ------------------------------------------------------
+    # Wait for protected item creation
+    # ------------------------------------------------------
+    Write-Host "Waiting for protected item..."
+
+    $timeout = 600
+    $elapsed = 0
+    $item = $null
+
+    do {
+        Start-Sleep -Seconds 20
+        $item = Get-AzRecoveryServicesBackupItem `
+                    -Container $container `
+                    -WorkloadType AzureVM
+        $elapsed += 20
+        Write-Host "Waiting for protection confirmation... ($elapsed sec)"
+
+    } while (-not $item -and $elapsed -lt $timeout)
+
+    if (-not $item) {
+        throw "Protected item did not appear within expected time."
+    }
+
+    Write-Host "Protection established successfully."
 }
 
-Write-Host "Protection established."
-
+# ----------------------------------------------------------
 # Trigger initial backup
+# ----------------------------------------------------------
 Write-Host "Triggering initial backup..."
 
-Backup-AzRecoveryServicesBackupItem -Item $item -Confirm:$false
+Backup-AzRecoveryServicesBackupItem `
+    -Item $item `
+    -Confirm:$false
 
 Write-Host "Initial backup triggered successfully."
 
