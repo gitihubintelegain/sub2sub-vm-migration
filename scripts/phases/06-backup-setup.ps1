@@ -29,12 +29,16 @@ Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 $uniqueSuffix = Get-Date -Format "yyyyMMddHHmmss"
 $vaultName = "$VMName-vault-$uniqueSuffix"
 
-Write-Host "Creating Recovery Services Vault: $vaultName"
+$vm = Get-AzVM -Name $VMName -ResourceGroupName $ResourceGroup
+$vaultLocation = $vm.Location
+
+Write-Host "VM Location: $vaultLocation"
+Write-Host "Creating vault in same region..."
 
 $vault = New-AzRecoveryServicesVault `
     -Name $vaultName `
     -ResourceGroupName $ResourceGroup `
-    -Location $Location
+    -Location $vaultLocation
 
 # Set vault context
 Set-AzRecoveryServicesVaultContext -Vault $vault
