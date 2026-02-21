@@ -109,7 +109,7 @@ $vault = Get-AzRecoveryServicesVault -Name $SourceVaultName -ErrorAction Stop
 Write-Host "Vault found: $($vault.Name)"
 
 # -------------------------------------------------------
-# 6. Validate Destination Subscription
+# 6. Validate Destination Subscription & Create RG If Missing
 # -------------------------------------------------------
 
 Write-Host "Switching to destination subscription..."
@@ -120,7 +120,34 @@ Write-Host "Destination subscription validated."
 $destRG = Get-AzResourceGroup -Name $ResourceGroup -ErrorAction SilentlyContinue
 
 if (-not $destRG) {
-    Write-Host "Destination Resource Group does not exist. It will be created during migration."
+
+    Write-Host "Destination Resource Group does not exist. Creating..."
+
+    # Switch back to source to get RG metadata
+    Set-AzContext -SubscriptionId $SourceSubscription -ErrorAction Stop
+    $sourceRG = Get-AzResourceGroup -Name $ResourceGroup -ErrorAction Stop
+
+    $location = $sourceRG.Location
+    $tags     = $sourceRG.Tags
+
+    # Switch again to destination
+    Set-AzContext -SubscriptionId $DestinationSubscription -ErrorAction Stop
+
+    if ($tags) {
+        New-AzResourceGroup `
+            -Name $ResourceGroup `
+            -Location $location `
+            -Tag $tags `
+            -ErrorAction Stop | Out-Null
+    }
+    else {
+        New-AzResourceGroup `
+            -Name $ResourceGroup `
+            -Location $location `
+            -ErrorAction Stop | Out-Null
+    }
+
+    Write-Host "Destination Resource Group created successfully."
 }
 else {
     Write-Host "Destination Resource Group exists."
