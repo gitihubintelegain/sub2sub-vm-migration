@@ -44,9 +44,17 @@ jobs:
           subscription-id: ${{ env.DEST_SUB }}
           enable-AzPSSession: true
 
-      - name: Install Latest Az Module
+      - name: Install Az Module
         shell: pwsh
         run: |
+          Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+
+          if (-not (Get-PSRepository -Name "PSGallery" -ErrorAction SilentlyContinue)) {
+              Register-PSRepository `
+                -Default `
+                -ErrorAction Stop
+          }
+
           Install-Module Az -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
           Import-Module Az -Force
 
