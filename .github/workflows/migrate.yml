@@ -101,6 +101,7 @@ jobs:
         working-directory: terraform
         run: |
           terraform apply -auto-approve \
+            -var="vm_name=${{ env.VM }}" \
             -var="resource_group=${{ env.RG }}" \
             -var="location=centralindia" \
             -var="unique_suffix=${{ steps.suffix.outputs.suffix }}"
