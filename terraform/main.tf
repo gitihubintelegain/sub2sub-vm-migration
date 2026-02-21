@@ -1,6 +1,4 @@
 terraform {
-  required_version = ">= 1.5.0"
-
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -14,52 +12,55 @@ provider "azurerm" {
 }
 
 # -----------------------------
-# Safe Name Handling
+# Backup Vault (Modern)
 # -----------------------------
-locals {
-  trimmed_vm_name = substr(var.vm_name, 0, 20)
-  vault_name      = "${local.trimmed_vm_name}-vault-${var.unique_suffix}"
-}
-
-# -----------------------------
-# Recovery Services Vault (LRS)
-# -----------------------------
-resource "azurerm_recovery_services_vault" "vault" {
-  name                = local.vault_name
+resource "azurerm_data_protection_backup_vault" "vault" {
+  name                = "backup-vault-${var.unique_suffix}"
   location            = var.location
   resource_group_name = var.resource_group
-  sku                 = "Standard"
 
-  storage_mode_type   = "LocallyRedundant"
-  soft_delete_enabled = true
+  datastore_type = "VaultStore"
+  redundancy     = "LocallyRedundant"
 }
 
 # -----------------------------
-# Enhanced Backup Policy (V2)
+# Backup Policy for Azure VM
 # -----------------------------
-resource "azurerm_backup_policy_vm" "policy" {
-  name                = "enhanced-daily-policy"
-  resource_group_name = var.resource_group
-  recovery_vault_name = azurerm_recovery_services_vault.vault.name
+resource "azurerm_data_protection_backup_policy_azure_vm" "policy" {
+  name     = "vm-daily-policy"
+  vault_id = azurerm_data_protection_backup_vault.vault.id
 
-  policy_type = "V2"
+  backup_repeating_time_intervals = ["R/2024-01-01T06:00:00+00:00/P1D"]
 
-  backup {
-    frequency = "Daily"
-    time      = "06:00"
+  retention_rule {
+    name     = "DailyRetention"
+    priority = 1
+
+    criteria {
+      absolute_criteria = "FirstOfDay"
+    }
+
+    life_cycle {
+      duration        = "P7D"
+      data_store_type = "VaultStore"
+    }
   }
 
-  retention_daily {
-    count = 7
+  default_retention_rule {
+    life_cycle {
+      duration        = "P7D"
+      data_store_type = "VaultStore"
+    }
   }
 }
 
 # -----------------------------
-# Protect VM
+# Backup Instance
 # -----------------------------
-resource "azurerm_backup_protected_vm" "vm_backup" {
-  resource_group_name = var.resource_group
-  recovery_vault_name = azurerm_recovery_services_vault.vault.name
-  source_vm_id        = var.vm_id
-  backup_policy_id    = azurerm_backup_policy_vm.policy.id
+resource "azurerm_data_protection_backup_instance_azure_vm" "vm_backup" {
+  name               = "vm-backup-${var.unique_suffix}"
+  vault_id           = azurerm_data_protection_backup_vault.vault.id
+  source_resource_id = var.vm_id
+
+  backup_policy_id = azurerm_data_protection_backup_policy_azure_vm.policy.id
 }
