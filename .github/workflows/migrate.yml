@@ -85,7 +85,7 @@ jobs:
       - name: Terraform Init
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
         working-directory: terraform
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Apply Backup
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
