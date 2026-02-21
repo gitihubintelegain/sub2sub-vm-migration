@@ -95,6 +95,7 @@ jobs:
         working-directory: terraform
         run: |
           rm -rf .terraform
+          rm -f .terraform.lock.hcl
           terraform init -upgrade -reconfigure
 
       - name: Terraform Version
