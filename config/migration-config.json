@@ -1,8 +1,8 @@
 {
-  "sourceSubscription": "d4e068bf-2473-4201-b10a-7f8501d50ebc",
-  "destinationSubscription": "46689057-be43-4229-9241-e0591dad4dbf",
+  "sourceSubscription": "46689057-be43-4229-9241-e0591dad4dbf",
+  "destinationSubscription": "d4e068bf-2473-4201-b10a-7f8501d50ebc",
   "resourceGroup": "Dev-RG",
   "vmName": "ubuntu",
   "destinationRegion": "centralindia",
-  "sourceVaultName": "ubuntu1"
+  "sourceVaultName": "ubuntu-rsv-20260221112520"
 }
