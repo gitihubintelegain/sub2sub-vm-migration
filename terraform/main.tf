@@ -1,8 +1,10 @@
 terraform {
+  required_version = ">= 1.5.0"
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 3.110.0"
+      version = ">= 3.120.0"
     }
   }
 }
@@ -12,7 +14,7 @@ provider "azurerm" {
 }
 
 # -----------------------------
-# Backup Vault (Modern)
+# Backup Vault (Modern Architecture)
 # -----------------------------
 resource "azurerm_data_protection_backup_vault" "vault" {
   name                = "backup-vault-${var.unique_suffix}"
@@ -30,7 +32,9 @@ resource "azurerm_data_protection_backup_policy_azure_vm" "policy" {
   name     = "vm-daily-policy"
   vault_id = azurerm_data_protection_backup_vault.vault.id
 
-  backup_repeating_time_intervals = ["R/2024-01-01T06:00:00+00:00/P1D"]
+  backup_repeating_time_intervals = [
+    "R/2024-01-01T06:00:00+00:00/P1D"
+  ]
 
   retention_rule {
     name     = "DailyRetention"
@@ -55,7 +59,7 @@ resource "azurerm_data_protection_backup_policy_azure_vm" "policy" {
 }
 
 # -----------------------------
-# Backup Instance
+# Backup Instance (Protect VM)
 # -----------------------------
 resource "azurerm_data_protection_backup_instance_azure_vm" "vm_backup" {
   name               = "vm-backup-${var.unique_suffix}"
