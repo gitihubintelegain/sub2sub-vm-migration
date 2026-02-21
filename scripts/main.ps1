@@ -110,19 +110,6 @@ if ($Phase -in @("post","all")) {
         -VMName $VMName `
         -Location "centralindia"
 }
-# -------------------------
-# Phase 6 - Post Move Backup Setup
-# -------------------------
-
-if ($Phase -in @("backupsetup","all")) {
-
-    Write-Host "Phase 6 - Backup Setup"
-
-    . "$PSScriptRoot/phases/06-backup-setup.ps1" `
-        -DestinationSubscription $DestinationSubscription `
-        -ResourceGroup $ResourceGroup `
-        -VMName $VMName
-}
 
 Write-Host "========================================="
 Write-Host "Execution Completed"
