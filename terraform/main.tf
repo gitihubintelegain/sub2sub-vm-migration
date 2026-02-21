@@ -4,7 +4,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 3.100.0"
+      version = ">= 3.110.0"
     }
   }
 }
@@ -35,12 +35,14 @@ resource "azurerm_recovery_services_vault" "vault" {
 }
 
 # -----------------------------
-# Enhanced Backup Policy
+# Enhanced Backup Policy (V2)
 # -----------------------------
-resource "azurerm_backup_policy_vm_enhanced" "policy" {
+resource "azurerm_backup_policy_vm" "policy" {
   name                = "enhanced-daily-policy"
   resource_group_name = var.resource_group
   recovery_vault_name = azurerm_recovery_services_vault.vault.name
+
+  policy_type = "V2"
 
   backup {
     frequency = "Daily"
@@ -59,5 +61,5 @@ resource "azurerm_backup_protected_vm" "vm_backup" {
   resource_group_name = var.resource_group
   recovery_vault_name = azurerm_recovery_services_vault.vault.name
   source_vm_id        = var.vm_id
-  backup_policy_id    = azurerm_backup_policy_vm_enhanced.policy.id
+  backup_policy_id    = azurerm_backup_policy_vm.policy.id
 }
