@@ -75,7 +75,7 @@ $resourcesToMove += $vm.Id
 # NIC
 $resourcesToMove += $nic.Id
 
-# Public IP
+# Public IP (attached one if existed)
 if ($publicIpId) {
     $resourcesToMove += $publicIpId
 }
@@ -97,6 +97,19 @@ $resourcesToMove += $vnetId
 # NSG
 if ($nic.NetworkSecurityGroup) {
     $resourcesToMove += $nic.NetworkSecurityGroup.Id
+}
+
+# -------------------------------------------------------
+# Include Standalone Public IPs (if any exist in RG)
+# -------------------------------------------------------
+
+$allPips = Get-AzPublicIpAddress -ResourceGroupName $ResourceGroup -ErrorAction SilentlyContinue
+
+foreach ($pip in $allPips) {
+    if ($pip.Id -notin $resourcesToMove) {
+        Write-Host "Including standalone Public IP: $($pip.Name)"
+        $resourcesToMove += $pip.Id
+    }
 }
 
 # Remove duplicates just in case
