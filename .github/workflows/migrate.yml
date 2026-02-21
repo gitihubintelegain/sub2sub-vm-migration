@@ -97,9 +97,9 @@ jobs:
           rm -rf .terraform
           terraform init -upgrade -reconfigure
 
-      - name: Show Provider Version
-        working-directory: terraform
-        run: terraform providers  
+      - name: Terraform Version
+        working-directory: terraform 
+        run: terraform version
 
       - name: Terraform Apply Backup
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
