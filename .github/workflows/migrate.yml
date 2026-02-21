@@ -93,7 +93,13 @@ jobs:
       - name: Terraform Init
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
         working-directory: terraform
-        run: terraform init -upgrade -reconfigure
+        run: |
+          rm -rf .terraform
+          terraform init -upgrade -reconfigure
+
+      - name: Show Provider Version
+        working-directory: terraform
+        run: terraform providers  
 
       - name: Terraform Apply Backup
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
