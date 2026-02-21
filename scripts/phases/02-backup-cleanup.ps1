@@ -90,7 +90,9 @@ Write-Host "Backup successfully disabled."
 
 Write-Host "Searching for Restore Point Collections..."
 
-$backupRGs = Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -like "AzureBackupRG_*" }
+$backupRGs = Get-AzResourceGroup | Where-Object {
+    $_.ResourceGroupName -like "AzureBackupRG_*"
+}
 
 foreach ($brg in $backupRGs) {
 
@@ -103,9 +105,38 @@ foreach ($brg in $backupRGs) {
 
     foreach ($rpc in $rpcResources) {
 
-        Write-Host "Found RPC: $($rpc.Name)"
-
         if ($rpc.Name -like "AzureBackup_$VMName*") {
+
+            Write-Host "Processing RPC: $($rpc.Name)"
+
+            # Get restore points inside collection
+            $restorePoints = Get-AzResource `
+                -ResourceGroupName $brg.ResourceGroupName `
+                -ResourceType "Microsoft.Compute/restorePointCollections/restorePoints" `
+                -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "$($rpc.Name)/*" }
+
+            foreach ($rp in $restorePoints) {
+
+                Write-Host "Ending access for restore point: $($rp.Name)"
+
+                try {
+                    Invoke-AzRestMethod `
+                        -Method POST `
+                        -Path "$($rp.ResourceId)/endGetAccess?api-version=2022-03-02" `
+                        -ErrorAction SilentlyContinue
+                }
+                catch {
+                    Write-Host "No active SAS session."
+                }
+
+                Write-Host "Deleting restore point: $($rp.Name)"
+
+                Remove-AzResource `
+                    -ResourceId $rp.ResourceId `
+                    -Force `
+                    -Confirm:$false
+            }
 
             Write-Host "Deleting RPC: $($rpc.Name)"
 
