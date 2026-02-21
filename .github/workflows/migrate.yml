@@ -48,13 +48,9 @@ jobs:
         shell: pwsh
         run: |
           Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted -ErrorAction SilentlyContinue
-
           if (-not (Get-PSRepository -Name "PSGallery" -ErrorAction SilentlyContinue)) {
-              Register-PSRepository `
-                -Default `
-                -ErrorAction Stop
+              Register-PSRepository -Default -ErrorAction Stop
           }
-
           Install-Module Az -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
           Import-Module Az -Force
 
@@ -99,7 +95,7 @@ jobs:
           terraform init -upgrade -reconfigure
 
       - name: Terraform Version
-        working-directory: terraform 
+        working-directory: terraform
         run: terraform version
 
       - name: Terraform Apply Backup
@@ -107,8 +103,44 @@ jobs:
         working-directory: terraform
         run: |
           terraform apply -auto-approve \
-            -var="vm_name=${{ env.VM }}" \
             -var="resource_group=${{ env.RG }}" \
             -var="location=centralindia" \
-            -var="vm_id=${{ steps.get_vm.outputs.vm_id }}" \
             -var="unique_suffix=${{ steps.suffix.outputs.suffix }}"
+
+      # ---------------------------
+      # Azure CLI Backup Steps
+      # ---------------------------
+
+      - name: Generate Backup Policy
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        run: |
+          az dataprotection backup-policy get-default-policy-template \
+            --datasource-type AzureIaasVM \
+            --output json > policy.json
+
+      - name: Create Backup Policy
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        run: |
+          az dataprotection backup-policy create \
+            --resource-group $RG \
+            --vault-name backup-vault-${{ steps.suffix.outputs.suffix }} \
+            --name vm-daily-policy \
+            --policy policy.json
+
+      - name: Enable Backup for VM
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        run: |
+          az dataprotection backup-instance create \
+            --resource-group $RG \
+            --vault-name backup-vault-${{ steps.suffix.outputs.suffix }} \
+            --name vm-backup-${{ steps.suffix.outputs.suffix }} \
+            --datasource-id ${{ steps.get_vm.outputs.vm_id }} \
+            --policy-name vm-daily-policy
+
+      - name: Trigger Initial Backup
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
+        run: |
+          az dataprotection backup-instance adhoc-backup \
+            --resource-group $RG \
+            --vault-name backup-vault-${{ steps.suffix.outputs.suffix }} \
+            --backup-instance-name vm-backup-${{ steps.suffix.outputs.suffix }}
