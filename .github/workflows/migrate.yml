@@ -109,21 +109,22 @@ jobs:
       # ---------------------------
       # Azure CLI Backup Steps
       # ---------------------------
-
+      
       - name: Enable Backup for VM
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
         run: |
-          az dataprotection backup-instance create \
+          az backup protection enable-for-vm \
             --resource-group $RG \
-            --vault-name backup-vault-${{ steps.suffix.outputs.suffix }} \
-            --name vm-backup-${{ steps.suffix.outputs.suffix }} \
-            --datasource-id ${{ steps.get_vm.outputs.vm_id }} \
-            --policy-name vm-daily-policy
+            --vault-name ${VM}-rsv-${{ steps.suffix.outputs.suffix }} \
+            --vm $VM \
+            --policy-name ${VM}-daily-11am-policy
 
       - name: Trigger Initial Backup
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
         run: |
-          az dataprotection backup-instance adhoc-backup \
+          az backup protection backup-now \
             --resource-group $RG \
-            --vault-name backup-vault-${{ steps.suffix.outputs.suffix }} \
-            --backup-instance-name vm-backup-${{ steps.suffix.outputs.suffix }}
+            --vault-name ${VM}-rsv-${{ steps.suffix.outputs.suffix }} \
+            --container-name $VM \
+            --item-name $VM \
+            --backup-management-type AzureIaasVM
