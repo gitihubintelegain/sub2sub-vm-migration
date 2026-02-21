@@ -93,6 +93,7 @@ jobs:
           terraform init -upgrade -reconfigure
 
       - name: Terraform Version
+        if: ${{ github.event.inputs.phase == 'backupsetup' }}
         working-directory: terraform
         run: terraform version
 
