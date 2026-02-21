@@ -111,22 +111,6 @@ jobs:
       # Azure CLI Backup Steps
       # ---------------------------
 
-      - name: Generate Backup Policy
-        if: ${{ github.event.inputs.phase == 'backupsetup' }}
-        run: |
-          az dataprotection backup-policy get-default-policy-template \
-            --datasource-type AzureIaasVM \
-            --output json > policy.json
-
-      - name: Create Backup Policy
-        if: ${{ github.event.inputs.phase == 'backupsetup' }}
-        run: |
-          az dataprotection backup-policy create \
-            --resource-group $RG \
-            --vault-name backup-vault-${{ steps.suffix.outputs.suffix }} \
-            --name vm-daily-policy \
-            --policy policy.json
-
       - name: Enable Backup for VM
         if: ${{ github.event.inputs.phase == 'backupsetup' }}
         run: |
