@@ -3,5 +3,5 @@ output "vault_name" {
 }
 
 output "policy_id" {
-  value = azurerm_data_protection_backup_policy_azure_vm.policy.id
+  value = azurerm_data_protection_backup_policy.policy.id
 }
