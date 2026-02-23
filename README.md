@@ -157,7 +157,7 @@ Example:
   "sourceSubscriptionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "destinationSubscriptionId": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
   "sourceResourceGroup": "source-rg",
-  "destinationResourceGroup": "destination-rg",
+  "sourceVaultName": "source-rsv",
   "location": "centralindia"
 }
 ```
