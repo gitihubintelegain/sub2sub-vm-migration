@@ -14,7 +14,7 @@ The migration framework is built using:
 
 -   GitHub Actions (CI/CD orchestration)
 -   OIDC-based authentication (no secrets stored)
--   Terraform (mandatory backup vault provisioning)
+-   Terraform (backup vault provisioning)
 -   PowerShell phase-based migration scripts
 -   Azure Resource Manager (Move-AzResource)
 -   Integrated Backup Handling (Recovery Services Vault)
