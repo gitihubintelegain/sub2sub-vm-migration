@@ -168,17 +168,17 @@ Example:
 
 GitHub → Actions → Sub2Sub VM Migration → Run Workflow
 
-### Available Phases
+### 📋 Available Phases
 
-  Phase         Description
-  ------------- ------------------------------
-  validate      Validate VM and dependencies
-  backup        Handle backup cleanup
-  prepare       Prepare VM for move
-  move          Execute Move-AzResource
-  post          Post-migration validation
-  backupsetup   Enable backup in destination
-  all           Full migration lifecycle
+| Phase        | Description                         |
+|-------------|-------------------------------------|
+| validate    | Validate VM and dependencies        |
+| backup      | Handle backup cleanup               |
+| prepare     | Prepare VM for move                 |
+| move        | Execute Move-AzResource             |
+| post        | Post-migration validation           |
+| backupsetup | Enable backup in destination        |
+| all         | Full migration lifecycle            |
 
 ------------------------------------------------------------------------
 
