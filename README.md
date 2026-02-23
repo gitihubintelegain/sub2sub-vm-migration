@@ -212,14 +212,15 @@ Backup Setup
 
 ## 🛡 Security Design Summary
 
-  Component                     Implementation
-  ----------------------------- ----------------
-  Authentication                GitHub OIDC
-  Secret Storage                None
-  Token Lifetime                Short-lived
-  Branch Restriction            main
-  Azure Backup Provisioning     Terraform
-  Resource Move                 ARM
+| Component              | Implementation        |
+|------------------------|-----------------------|
+| Authentication         | GitHub OIDC           |
+| Secret Storage         | None                  |
+| Token Lifetime         | Short-lived           |
+| Branch Restriction     | main                  |
+| Infrastructure         | Terraform             |
+| Resource Move          | Azure Resource Manager |
+| Backup Provisioning    | Azure CLI + Terraform |
 
 ------------------------------------------------------------------------
 
