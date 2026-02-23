@@ -218,9 +218,9 @@ Backup Setup
 | Secret Storage         | None                  |
 | Token Lifetime         | Short-lived           |
 | Branch Restriction     | main                  |
-| Infrastructure         | Terraform             |
+| Backup Provisioning & Policy   | Terraform     |
 | Resource Move          | Azure Resource Manager |
-| Backup Provisioning    | Azure CLI + Terraform |
+| Backup Enable & Start  | Azure CLI             |
 
 ------------------------------------------------------------------------
 
