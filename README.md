@@ -235,6 +235,6 @@ Backup Setup
 
 ## 👨‍💻 Maintainer
 
-Enterprise-grade Azure VM migration automation built by darshan thenge using GitHub
-Actions, Terraform, OIDC federation, Azure CLI and structured PowerShell
-execution.
+Enterprise-grade Azure VM migration automation built by Darshan Thenge 
+using GitHub Actions, Terraform, OIDC federation, Azure CLI and 
+structured PowerShell execution.
