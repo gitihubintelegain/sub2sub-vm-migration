@@ -1,8 +1,8 @@
 {
-  "sourceSubscription": "46689057-be43-4229-9241-e0591dad4dbf",
-  "destinationSubscription": "d4e068bf-2473-4201-b10a-7f8501d50ebc",
-  "resourceGroup": "Dev-RG",
-  "vmName": "ubuntu",
-  "destinationRegion": "centralindia",
-  "sourceVaultName": "ubuntu-rsv-20260221112520"
+  "sourceSubscription": "da51fd51-bb1b-4d29-a74b-c757ea40ce98",
+  "destinationSubscription": "2e759f5d-7b70-4c10-bd15-f1058b7a96f6",
+  "resourceGroup": "git",
+  "vmName": "CodeRepoVm",
+  "destinationRegion": "southeastasia",
+  "sourceVaultName": "GITBackupVault"
 }
