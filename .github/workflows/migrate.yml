@@ -35,7 +35,8 @@ jobs:
           echo "RG=$(jq -r .resourceGroup config/migration-config.json)" >> $GITHUB_ENV
           echo "VM=$(jq -r .vmName config/migration-config.json)" >> $GITHUB_ENV
           echo "VAULT=$(jq -r .sourceVaultName config/migration-config.json)" >> $GITHUB_ENV
-
+          echo "DEST_REGION=$(jq -r .destinationRegion config/migration-config.json)" >> $GITHUB_ENV
+          
       - name: Azure Login
         uses: azure/login@v2
         with:
