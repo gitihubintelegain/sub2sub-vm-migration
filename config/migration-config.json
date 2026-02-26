@@ -1,8 +1,8 @@
 {
-  "sourceSubscription": "da51fd51-bb1b-4d29-a74b-c757ea40ce98",
-  "destinationSubscription": "2e759f5d-7b70-4c10-bd15-f1058b7a96f6",
-  "resourceGroup": "git",
-  "vmName": "CodeRepoVm",
-  "destinationRegion": "southeastasia",
-  "sourceVaultName": "GITBackupVault"
+  "sourceSubscription": "da51fd51-bb1b-4d29-a74b-c757ea4",
+  "destinationSubscription": "2e759f5d-7b70-4c10-bd15-f1058b",
+  "resourceGroup": "g",
+  "vmName": "Code",
+  "destinationRegion": "southeastas",
+  "sourceVaultName": "GITBackupVa"
 }
