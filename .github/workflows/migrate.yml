@@ -104,9 +104,9 @@ jobs:
           terraform apply -auto-approve \
             -var="vm_name=${{ env.VM }}" \
             -var="resource_group=${{ env.RG }}" \
-            -var="location=centralindia" \
+            -var="location=${{ env.DEST_REGION }}" \
             -var="unique_suffix=${{ steps.suffix.outputs.suffix }}"
-
+            
       # ---------------------------
       # Azure CLI Backup Steps
       # ---------------------------
