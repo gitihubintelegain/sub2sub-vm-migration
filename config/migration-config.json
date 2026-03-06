@@ -3,6 +3,6 @@
   "destinationSubscription": "da51fd51-bb1b-4d29-a74b-c757ea40ce98",
   "resourceGroup": "git",
   "vmName": "CoderepoVM",
-  "destinationRegion": "southeastas",
+  "destinationRegion": "southeastasia",
   "sourceVaultName": "CodeRepoVMBackupVault"
 }
