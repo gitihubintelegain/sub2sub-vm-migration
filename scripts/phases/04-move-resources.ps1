@@ -61,21 +61,29 @@ catch {
     Write-Host "🔴 Exception Message:"
     Write-Host $moveError.Exception.Message
 
-    if ($moveError.Exception.InnerException) {
-        Write-Host "`n🔴 Inner Exception:"
-        Write-Host $moveError.Exception.InnerException.Message
-    }
+    # 👇 MOST IMPORTANT PART (REAL ERROR)
+    if ($moveError.Exception.Response -and $moveError.Exception.Response.Content) {
+        Write-Host "`n🔴 RAW AZURE RESPONSE (REAL ROOT CAUSE):"
 
-    if ($moveError.ErrorDetails) {
-        Write-Host "`n🔴 Azure Error Details:"
-        Write-Host $moveError.ErrorDetails.Message
+        try {
+            $json = $moveError.Exception.Response.Content | ConvertFrom-Json -ErrorAction Stop
+            $json.error | Format-List * -Force
+
+            if ($json.error.details) {
+                Write-Host "`n🔴 INNER ERROR DETAILS:"
+                $json.error.details | Format-List * -Force
+            }
+        }
+        catch {
+            Write-Host $moveError.Exception.Response.Content
+        }
     }
 
     Write-Host "`n🔴 Full Error Dump:"
     $moveError | Format-List * -Force
 
     Write-Host "========================================="
-    Write-Warning "Continuing with validation (Azure moves can still succeed)..."
+    Write-Warning "Continuing with validation..."
 }
 
 # Switch to destination subscription
