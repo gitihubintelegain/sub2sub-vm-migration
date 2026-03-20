@@ -1,8 +1,8 @@
 {
-  "sourceSubscription": "2e759f5d-7b70-4c10-bd15-f1058b7a96f6",
-  "destinationSubscription": "da51fd51-bb1b-4d29-a74b-c757ea40ce98",
-  "resourceGroup": "git",
-  "vmName": "CoderepoVM",
+  "sourceSubscription": "79ad8c74-4ecd-407d-bd84-cb31a4450553",
+  "destinationSubscription": "f608a8ac-0d2e-4731-906d-7bb3b708f410",
+  "resourceGroup": "WindowsDwebNew-RG",
+  "vmName": "WindowsDwebNew",
   "destinationRegion": "southeastasia",
-  "sourceVaultName": "CodeRepoVMBackupVault"
+  "sourceVaultName": "wind-dweb"
 }
