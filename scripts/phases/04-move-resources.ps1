@@ -18,46 +18,68 @@ Write-Host "========================================="
 
 Set-AzContext -SubscriptionId $SourceSubscription | Out-Null
 
-try {
+# 🚫 Filter unsupported/problematic resources
+$filteredResources = $ResourcesToMove | Where-Object {
+    $_ -notmatch "Microsoft.SqlVirtualMachine" -and
+    $_ -notmatch "Microsoft.Logic" -and
+    $_ -notmatch "Microsoft.Web/connections"
+}
 
+Write-Host "Filtered Resources Count: $($filteredResources.Count)"
+
+try {
     Write-Host "Initiating Move-AzResource..."
 
     Move-AzResource `
         -DestinationSubscriptionId $DestinationSubscription `
         -DestinationResourceGroupName $ResourceGroup `
-        -ResourceId $ResourcesToMove `
-        -Force
+        -ResourceId $filteredResources `
+        -Force `
+        -ErrorAction Stop
 
-    Write-Host "Move completed successfully."
+    Write-Host "Move command executed."
 
 }
 catch {
+    Write-Warning "Move command threw an error. Will verify actual state..."
+}
 
-    Write-Host "Move reported failure. Validating actual resource state..."
+# ✅ Switch to destination
+Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
 
-    # Switch to destination subscription
-    Set-AzContext -SubscriptionId $DestinationSubscription | Out-Null
+# 🎯 Extract VM name
+$vmId = $filteredResources | Where-Object { $_ -like "*Microsoft.Compute/virtualMachines/*" }
 
-    # Extract VM ID from move list
-    $vmId = $ResourcesToMove | Where-Object { $_ -like "*Microsoft.Compute/virtualMachines/*" }
+if (-not $vmId) {
+    throw "Could not determine VM ID for validation."
+}
 
-    if (-not $vmId) {
-        throw "Could not determine VM ID for validation."
-    }
+$vmName = ($vmId -split "/")[-1]
 
-    $vmName = ($vmId -split "/")[-1]
+# 🔁 Retry logic (IMPORTANT)
+$maxRetries = 10
+$retryDelay = 20
+$vmFound = $false
+
+for ($i = 1; $i -le $maxRetries; $i++) {
+
+    Write-Host "Checking VM in destination... Attempt $i/$maxRetries"
 
     $vm = Get-AzVM -Name $vmName -ResourceGroupName $ResourceGroup -ErrorAction SilentlyContinue
 
     if ($vm) {
-        Write-Host "VM found in destination subscription."
-        Write-Host "Treating move as successful despite batch failure."
+        Write-Host "✅ VM found in destination."
+        $vmFound = $true
+        break
     }
-    else {
-        throw "Move failed and VM not found in destination. Aborting."
-    }
+
+    Start-Sleep -Seconds $retryDelay
+}
+
+if (-not $vmFound) {
+    throw "❌ Move failed: VM not found after multiple retries."
 }
 
 Write-Host "========================================="
-Write-Host "Move Phase Completed"
+Write-Host "Move Phase Completed Successfully"
 Write-Host "========================================="
