@@ -103,7 +103,7 @@ if (-not $vmId) {
 $vmName = ($vmId -split "/")[-1]
 
 # Retry settings
-$maxRetries = 12
+$maxRetries = 6
 $retryDelay = 20
 $vmFound = $false
 
