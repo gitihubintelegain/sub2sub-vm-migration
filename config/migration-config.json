@@ -1,8 +1,8 @@
 {
-  "sourceSubscription": "d4e068bf-2473-4201-b10a-7f8501d50ebc",
-  "destinationSubscription": "46689057-be43-4229-9241-e0591dad4dbf",
-  "resourceGroup": "Dev-RG",
-  "vmName": "ubuntu",
+  "sourceSubscription": "b645b999-34f1-4bb5-842a-5444a5bcf3bf",
+  "destinationSubscription": "79ad8c74-4ecd-407d-bd84-cb31a4450553",
+  "resourceGroup": "WindowsDwebNew-RG",
+  "vmName": "WindowsDwebNew",
   "destinationRegion": "centralindia",
-  "sourceVaultName": "ubuntu-rsv-20260223133710"
+  "sourceVaultName": "Windweb-rsv"
 }
